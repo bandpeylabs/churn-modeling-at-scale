@@ -85,90 +85,42 @@ except Exception as e:
 
 # COMMAND ----------
 
-# Function to create table if not exists
-
-
-def create_table_if_not_exists(table_name, schema_definition):
-    try:
-        spark.sql(
-            f"CREATE TABLE IF NOT EXISTS {table_name} {schema_definition}")
-        print(f"Table created/verified: {table_name}")
-    except Exception as e:
-        print(f"Table creation warning for {table_name}: {e}")
-
+# Create empty tables without schemas
+# Schemas will be determined after data exploration
 
 # Bronze layer tables
 bronze_tables = config['tables']['bronze']
 for table_key, table_name in bronze_tables.items():
-    if table_key == 'wikimedia_pageviews':
-        schema_def = """
-        (
-            project STRING,
-            page_title STRING,
-            view_count INT,
-            access_method STRING,
-            source_file STRING,
-            ingestion_timestamp TIMESTAMP,
-            data_source STRING,
-            file_date STRING
-        )
-        USING DELTA
-        PARTITIONED BY (file_date, project)
-        """
-    else:
-        schema_def = """
-        (
-            id STRING,
-            data STRING,
-            ingestion_timestamp TIMESTAMP,
-            data_source STRING
-        )
-        USING DELTA
-        """
-
-    create_table_if_not_exists(table_name, schema_def)
+    # Create empty table - schema will be inferred from data
+    try:
+        spark.sql(
+            f"CREATE TABLE IF NOT EXISTS {table_name} (dummy STRING) USING DELTA")
+        spark.sql(f"DELETE FROM {table_name}")  # Clear dummy data
+        print(f"Empty table created: {table_name}")
+    except Exception as e:
+        print(f"Table creation warning for {table_name}: {e}")
 
 # Silver layer tables
 silver_tables = config['tables']['silver']
 for table_key, table_name in silver_tables.items():
-    schema_def = """
-    (
-        project STRING,
-        page_title STRING,
-        view_count INT,
-        access_method STRING,
-        cleaned_timestamp TIMESTAMP,
-        data_quality_score DOUBLE
-    )
-    USING DELTA
-    """
-    create_table_if_not_exists(table_name, schema_def)
+    try:
+        spark.sql(
+            f"CREATE TABLE IF NOT EXISTS {table_name} (dummy STRING) USING DELTA")
+        spark.sql(f"DELETE FROM {table_name}")  # Clear dummy data
+        print(f"Empty table created: {table_name}")
+    except Exception as e:
+        print(f"Table creation warning for {table_name}: {e}")
 
 # Gold layer tables
 gold_tables = config['tables']['gold']
 for table_key, table_name in gold_tables.items():
-    if table_key == 'predictions':
-        schema_def = """
-        (
-            user_id STRING,
-            churn_probability DOUBLE,
-            prediction_date DATE,
-            model_version STRING,
-            created_timestamp TIMESTAMP
-        )
-        USING DELTA
-        """
-    else:
-        schema_def = """
-        (
-            id STRING,
-            features STRING,
-            created_timestamp TIMESTAMP
-        )
-        USING DELTA
-        """
-
-    create_table_if_not_exists(table_name, schema_def)
+    try:
+        spark.sql(
+            f"CREATE TABLE IF NOT EXISTS {table_name} (dummy STRING) USING DELTA")
+        spark.sql(f"DELETE FROM {table_name}")  # Clear dummy data
+        print(f"Empty table created: {table_name}")
+    except Exception as e:
+        print(f"Table creation warning for {table_name}: {e}")
 
 # COMMAND ----------
 
