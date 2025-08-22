@@ -1,11 +1,6 @@
 # Databricks notebook source
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC # Environment Configuration
-# MAGIC
-# MAGIC **Purpose**: Set up the complete Databricks environment for churn modeling project
 # MAGIC
 # MAGIC This notebook:
 # MAGIC - Loads configuration from YAML file
@@ -21,7 +16,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install pyyaml requests
+# MAGIC %pip install ../requirements.txt
 
 # COMMAND ----------
 
