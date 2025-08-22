@@ -16,7 +16,8 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install ../requirements.txt
+# MAGIC %pip install -r ../requirements.txt
+# MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
 
@@ -31,7 +32,7 @@ import os
 from datetime import datetime, timedelta
 
 # Load configuration from YAML file
-with open('./config/environment.yaml', 'r') as file:
+with open('../config/environment.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
 config = config['main']
@@ -48,8 +49,15 @@ print(f"Volume: {config['volume']}")
 
 # COMMAND ----------
 
-# Create catalog
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {config['catalog']}")
+try:
+    spark.sql(
+        f"CREATE CATALOG IF NOT EXISTS {config['catalog']}"
+    )
+    print(f"Catalog created: {config['catalog']}")
+except Exception as e:
+    print(f"Catalog creation warning: {e}")
+    print("Catalog may already exist or permissions may be required")
+
 spark.sql(f"USE CATALOG {config['catalog']}")
 
 # Create schema
@@ -84,9 +92,6 @@ except Exception as e:
 # MAGIC ## Create All Tables Structure
 
 # COMMAND ----------
-
-# Create empty tables without schemas
-# Schemas will be determined after data exploration
 
 # Bronze layer tables
 bronze_tables = config['tables']['bronze']
@@ -231,27 +236,6 @@ try:
         print(f"  - {volume['volumeName']}")
 except Exception as e:
     print(f"Volumes: Error listing volumes - {e}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Summary
-# MAGIC
-# MAGIC **Environment setup completed**
-# MAGIC
-# MAGIC **Created:**
-# MAGIC - Unity Catalog: `{config['catalog']}`
-# MAGIC - Schema: `{config['schema']}`
-# MAGIC - Volume: `{config['volume']}` for raw data storage
-# MAGIC - Bronze tables: {list(bronze_tables.values())}
-# MAGIC - Silver tables: {list(silver_tables.values())}
-# MAGIC - Gold tables: {list(gold_tables.values())}
-# MAGIC - Environment variables for configuration
-# MAGIC - Wikimedia download URLs generated
-# MAGIC
-# MAGIC **Next steps:**
-# MAGIC - Run the ingestion notebook to download and process data
-# MAGIC - Create Silver and Gold layer tables as needed
 
 # COMMAND ----------
 
