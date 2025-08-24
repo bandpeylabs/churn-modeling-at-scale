@@ -164,10 +164,28 @@ print("Environment variables set")
 ml_config = config['ml']
 experiment_name = ml_config['experiment_name']
 
-# Create MLflow experiment
-mlflow.set_experiment(experiment_name)
+# Get current user from dbutils and build experiment path
+current_user = dbutils.notebook.entry_point.getDbutils(
+).notebook().getContext().userName().get()
+experiment_path = f"/Users/{current_user}/{experiment_name}"
 
-print(f"MLflow experiment created: {experiment_name}")
+# Create MLflow experiment with proper error handling
+try:
+    # Create experiment if it doesn't exist
+    experiment = mlflow.get_experiment_by_name(experiment_path)
+    if experiment is None:
+        experiment_id = mlflow.create_experiment(experiment_path)
+        print(
+            f"MLflow experiment created: {experiment_path} (ID: {experiment_id})")
+    else:
+        print(
+            f"MLflow experiment found: {experiment_path} (ID: {experiment.experiment_id})")
+
+    # Set as active experiment
+    mlflow.set_experiment(experiment_path)
+except Exception as e:
+    print(f"MLflow experiment setup warning: {e}")
+    print("Continuing without MLflow experiment setup")
 
 # COMMAND ----------
 
