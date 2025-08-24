@@ -1,7 +1,4 @@
 # Databricks notebook source
-
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC # Wikimedia Pageview Data Ingestion
 # MAGIC
@@ -55,11 +52,6 @@ urls_df.show(5, truncate=False)
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Download Files Using Spark
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ## Download Files Using DataFrame
 
 # COMMAND ----------
@@ -74,7 +66,7 @@ files_to_download = urls_df.filter(
 print(f"Found {files_to_download.count()} pageviews files to download")
 
 # Limit downloads for demo (can be increased or removed for production)
-max_downloads = 5
+max_downloads = urls_df.count()
 files_to_download = files_to_download.limit(max_downloads)
 
 print(f"Starting download of {max_downloads} files")
@@ -115,7 +107,7 @@ download_results_df.show(truncate=False)
 
 # MAGIC %md
 # MAGIC ## Define Spark Schema for Wikimedia Data
-
+# MAGIC
 # MAGIC Based on the sample data structure:
 # MAGIC `"project page_title view_count access_method"`
 # MAGIC
@@ -123,14 +115,12 @@ download_results_df.show(truncate=False)
 
 # COMMAND ----------
 
-# Define schema for Wikimedia pageview data
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+
 wikimedia_schema = StructType([
-    # e.g., "en.wikipedia", "de.wikipedia"
     StructField("project", StringType(), True),
-    # e.g., "Main_Page", "Python_(programming_language)"
     StructField("page_title", StringType(), True),
-    StructField("view_count", IntegerType(), True),      # Number of pageviews
-    # e.g., "desktop", "mobile-web"
+    StructField("view_count", IntegerType(), True),
     StructField("access_method", StringType(), True)
 ])
 
@@ -231,10 +221,11 @@ print(f"Writing to bronze table: {bronze_table_name}")
 
 # COMMAND ----------
 
-# Write to Delta table with partitioning
 final_bronze_df.write \
     .format("delta") \
     .mode("overwrite") \
+    .option("mergeSchema", "true") \
+    .option("overwriteSchema", "true") \
     .partitionBy("file_timestamp", "project") \
     .saveAsTable(bronze_table_name)
 
