@@ -26,6 +26,7 @@
 
 # COMMAND ----------
 
+from pyspark.sql.functions import to_timestamp, concat, lit
 import mlflow
 import yaml
 import os
@@ -180,38 +181,43 @@ except Exception as e:
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Create Data Source URLs
+# MAGIC ## Load Files List and Create URLs
 
 # COMMAND ----------
 
-# Generate Wikimedia download URLs using regex pattern
+# Load the files list from CSV
+files_csv_path = "./config/files.csv"
+
+# Read CSV with proper schema
+files_df = spark.read \
+    .option("header", "true") \
+    .option("inferSchema", "true") \
+    .csv(files_csv_path)
+
+# Convert timestamp string to proper timestamp type
+
+files_df = files_df.withColumn(
+    "timestamp",
+    to_timestamp(col("timestamp"), "dd-MMM-yyyy HH:mm")
+)
+
+# Get base URL from config and create full URLs
 wikimedia_config = config['data_sources']['wikimedia']
 base_url = wikimedia_config['base_url']
-start_date = wikimedia_config['start_date']
-end_date = wikimedia_config['end_date']
 
-# Simple regex-based file generation
-urls = []
-start_dt = datetime.strptime(start_date, '%Y%m%d')
-end_dt = datetime.strptime(end_date, '%Y%m%d')
+# Add full_url column by combining base_url with filename
+files_df = files_df.withColumn(
+    "full_url",
+    concat(lit(base_url), lit("/"), col("filename"))
+)
 
-current_dt = start_dt
-while current_dt <= end_dt:
-    date_str = current_dt.strftime('%Y%m%d')
-    for hour in range(24):
-        hour_str = f"{hour:06d}"  # 000000, 010000, etc.
-        filename = f"pageviews-{date_str}-{hour_str}.gz"
-        url = f"{base_url}/{filename}"
-        urls.append({
-            'url': url,
-            'filename': filename
-        })
-    current_dt += timedelta(days=1)
+print(f"Loaded {files_df.count()} files from CSV")
+print("Sample files with URLs:")
+files_df.select("filename", "timestamp", "file_size_bytes",
+                "full_url").show(5, truncate=False)
 
-print(f"Generated {len(urls)} download URLs")
-print("Sample URLs:")
-for url_info in urls[:3]:
-    print(f"  {url_info['filename']}")
+# Store the DataFrame for use in other notebooks
+urls_df = files_df
 
 # COMMAND ----------
 
@@ -251,6 +257,6 @@ except Exception as e:
 dbutils.notebook.exit({
     "status": "success",
     "config": config,
-    "urls": urls,
+    "urls_df": urls_df,
     "message": "Environment setup completed successfully"
 })

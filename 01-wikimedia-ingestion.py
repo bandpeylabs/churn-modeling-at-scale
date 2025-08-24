@@ -35,46 +35,22 @@
 # COMMAND ----------
 
 # Import required functions for data processing
+from pyspark.sql.functions import to_timestamp
 from datetime import datetime, timedelta
-from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
+from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split, to_timestamp
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Generate Download URLs
+# MAGIC ## Use Files DataFrame from Environment Setup
 
 # COMMAND ----------
 
-# Generate URLs using simple iteration
-# Using variables loaded from environment notebook
-base_url = config['data_sources']['wikimedia']['base_url']
-start_date = config['data_sources']['wikimedia']['start_date']
-end_date = config['data_sources']['wikimedia']['end_date']
-
-urls = []
-start_dt = datetime.strptime(start_date, '%Y%m%d')
-end_dt = datetime.strptime(end_date, '%Y%m%d')
-
-current_dt = start_dt
-while current_dt <= end_dt:
-    date_str = current_dt.strftime('%Y%m%d')
-    for hour in range(24):
-        hour_str = f"{hour:06d}"  # 000000, 010000, etc.
-        filename = f"pageviews-{date_str}-{hour_str}.gz"
-        url = f"{base_url}/{filename}"
-        urls.append({
-            'url': url,
-            'filename': filename,
-            'date': current_dt.strftime('%Y-%m-%d'),
-            'hour': hour_str
-        })
-    current_dt += timedelta(days=1)
-
-print(f"Generated {len(urls)} download URLs")
-print("Sample URLs:")
-for url_info in urls[:3]:
-    print(f"  {url_info['filename']}")
+# The files DataFrame is already loaded from the environment setup
+# It contains: filename, timestamp, file_size_bytes, full_url
+print(f"Using files DataFrame with {urls_df.count()} available files")
+print("\nSample files:")
+urls_df.show(5, truncate=False)
 
 # COMMAND ----------
 
@@ -83,33 +59,60 @@ for url_info in urls[:3]:
 
 # COMMAND ----------
 
-# Use Spark to download files to volume
-# This is more efficient than Python requests for large files
-download_count = 0
-max_downloads = 5  # Can be increased for more files
+# MAGIC %md
+# MAGIC ## Download Files Using DataFrame
 
-print(
-    f"Starting download of {max_downloads} files from {len(urls)} total available files")
+# COMMAND ----------
 
-for url_info in urls[:max_downloads]:
-    url = url_info['url']
-    filename = url_info['filename']
+# Filter files to download (e.g., only pageviews files, or specific date range)
+# You can modify this filter based on your needs
+files_to_download = urls_df.filter(
+    (col("filename").like("pageviews-%")) &
+    (col("file_size_bytes") > 0)
+).orderBy("timestamp")
+
+print(f"Found {files_to_download.count()} pageviews files to download")
+
+# Limit downloads for demo (can be increased or removed for production)
+max_downloads = 5
+files_to_download = files_to_download.limit(max_downloads)
+
+print(f"Starting download of {max_downloads} files")
+
+# Download files using Spark
+download_results = []
+for row in files_to_download.collect():
+    filename = row['filename']
+    full_url = row['full_url']
+    file_size = row['file_size_bytes']
     local_path = f"{volume_path}/{filename}"
 
-    print(f"Downloading: {filename}")
+    print(f"Downloading: {filename} ({file_size} bytes)")
     try:
         # Use Spark to download file
-        spark.sparkContext.addFile(url)
+        spark.sparkContext.addFile(full_url)
         # Copy from Spark temp location to volume
         dbutils.fs.cp(
             f"file://{spark.sparkContext.getLocalFile(filename)}", local_path)
-        download_count += 1
+        download_results.append({
+            'filename': filename,
+            'status': 'success',
+            'local_path': local_path,
+            'file_size': file_size
+        })
         print(f"Downloaded: {filename}")
     except Exception as e:
+        download_results.append({
+            'filename': filename,
+            'status': 'failed',
+            'error': str(e)
+        })
         print(f"Failed: {filename} - {e}")
 
-print(f"Downloaded {download_count}/{max_downloads} files")
-print(f"Total files available: {len(urls)} (31 days × 24 hours = 744 files)")
+# Create download results DataFrame
+download_results_df = spark.createDataFrame(download_results)
+print(f"\nDownload summary:")
+download_results_df.show(truncate=False)
 
 # COMMAND ----------
 
