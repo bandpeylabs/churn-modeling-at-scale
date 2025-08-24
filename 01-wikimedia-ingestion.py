@@ -264,22 +264,47 @@ bronze_table.show(5, truncate=False)
 
 # COMMAND ----------
 
-# Check for nulls and create DataFrame for visualization
-null_counts_data = []
-for column in bronze_table.columns:
-    null_count = bronze_table.filter(f"{column} IS NULL").count()
-    total_count = bronze_table.count()
-    null_percentage = (null_count / total_count) * \
-        100 if total_count > 0 else 0
-    null_counts_data.append({
-        "column": column,
-        "null_count": null_count,
-        "total_count": total_count,
-        "null_percentage": round(null_percentage, 2)
-    })
-
-null_counts_df = spark.createDataFrame(null_counts_data)
-display(null_counts_df)
+# MAGIC %sql
+# MAGIC -- Check for nulls in each column
+# MAGIC SELECT
+# MAGIC   'project' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(project) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(project) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(project)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'page_title' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(page_title) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(page_title) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(page_title)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'view_count' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(view_count) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(view_count) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(view_count)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'access_method' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(access_method) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(access_method) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(access_method)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC ORDER BY column_name;
 
 # COMMAND ----------
 
@@ -288,10 +313,14 @@ display(null_counts_df)
 
 # COMMAND ----------
 
-# Project distribution for visualization
-project_distribution = bronze_table.groupBy(
-    "project").count().orderBy("count", ascending=False)
-display(project_distribution)
+# MAGIC %sql
+# MAGIC -- Project distribution for visualization
+# MAGIC SELECT
+# MAGIC   project,
+# MAGIC   COUNT(*) as record_count
+# MAGIC FROM ${bronze_table_name}
+# MAGIC GROUP BY project
+# MAGIC ORDER BY record_count DESC;
 
 # COMMAND ----------
 
@@ -300,21 +329,31 @@ display(project_distribution)
 
 # COMMAND ----------
 
-# Access method distribution for visualization
-access_method_distribution = bronze_table.groupBy(
-    "access_method").count().orderBy("count", ascending=False)
-display(access_method_distribution)
+# MAGIC %sql
+# MAGIC -- Access method distribution for visualization
+# MAGIC SELECT
+# MAGIC   access_method,
+# MAGIC   COUNT(*) as record_count
+# MAGIC FROM ${bronze_table_name}
+# MAGIC GROUP BY access_method
+# MAGIC ORDER BY record_count DESC;
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ### View Count Statistics
-
-# COMMAND ----------
-
-# View count statistics for visualization
-view_count_stats = bronze_table.select("view_count").summary()
-display(view_count_stats)
+# MAGIC %sql
+# MAGIC -- View count statistics
+# MAGIC SELECT
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   MIN(view_count) as min_views,
+# MAGIC   MAX(view_count) as max_views,
+# MAGIC   AVG(view_count) as avg_views,
+# MAGIC   STDDEV(view_count) as stddev_views,
+# MAGIC   PERCENTILE(view_count, 0.25) as p25_views,
+# MAGIC   PERCENTILE(view_count, 0.50) as median_views,
+# MAGIC   PERCENTILE(view_count, 0.75) as p75_views,
+# MAGIC   PERCENTILE(view_count, 0.95) as p95_views
+# MAGIC FROM ${bronze_table_name}
+# MAGIC WHERE view_count IS NOT NULL;
 
 # COMMAND ----------
 
@@ -323,10 +362,14 @@ display(view_count_stats)
 
 # COMMAND ----------
 
-# File timestamp distribution for visualization
-timestamp_distribution = bronze_table.groupBy(
-    "file_timestamp").count().orderBy("file_timestamp")
-display(timestamp_distribution)
+# MAGIC %sql
+# MAGIC -- File timestamp distribution for visualization
+# MAGIC SELECT
+# MAGIC   file_timestamp,
+# MAGIC   COUNT(*) as record_count
+# MAGIC FROM ${bronze_table_name}
+# MAGIC GROUP BY file_timestamp
+# MAGIC ORDER BY file_timestamp;
 
 # COMMAND ----------
 
@@ -335,10 +378,14 @@ display(timestamp_distribution)
 
 # COMMAND ----------
 
-# Data volume by source file for visualization
-file_volume = bronze_table.groupBy(
-    "filename").count().orderBy("count", ascending=False)
-display(file_volume)
+# MAGIC %sql
+# MAGIC -- Data volume by source file for visualization
+# MAGIC SELECT
+# MAGIC   filename,
+# MAGIC   COUNT(*) as record_count
+# MAGIC FROM ${bronze_table_name}
+# MAGIC GROUP BY filename
+# MAGIC ORDER BY record_count DESC;
 
 # COMMAND ----------
 
@@ -347,29 +394,47 @@ display(file_volume)
 
 # COMMAND ----------
 
-# Create summary DataFrame for visualization
-summary_data = [{
-    "metric": "Total Records",
-    "value": bronze_table.count()
-}, {
-    "metric": "Total Files Processed",
-    "value": bronze_table.select("filename").distinct().count()
-}, {
-    "metric": "Unique Projects",
-    "value": bronze_table.select("project").distinct().count()
-}, {
-    "metric": "Unique Page Titles",
-    "value": bronze_table.select("page_title").distinct().count()
-}, {
-    "metric": "Date Range Start",
-    "value": bronze_table.agg({"file_timestamp": "min"}).collect()[0]["min(file_timestamp)"]
-}, {
-    "metric": "Date Range End",
-    "value": bronze_table.agg({"file_timestamp": "max"}).collect()[0]["max(file_timestamp)"]
-}]
-
-summary_df = spark.createDataFrame(summary_data)
-display(summary_df)
+# MAGIC %sql
+# MAGIC -- Summary statistics overview
+# MAGIC SELECT
+# MAGIC   'Total Records' as metric,
+# MAGIC   COUNT(*) as value
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Total Files Processed' as metric,
+# MAGIC   COUNT(DISTINCT filename) as value
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Unique Projects' as metric,
+# MAGIC   COUNT(DISTINCT project) as value
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Unique Page Titles' as metric,
+# MAGIC   COUNT(DISTINCT page_title) as value
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Date Range Start' as metric,
+# MAGIC   MIN(file_timestamp) as value
+# MAGIC FROM ${bronze_table_name}
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Date Range End' as metric,
+# MAGIC   MAX(file_timestamp) as value
+# MAGIC FROM ${bronze_table_name};
 
 # COMMAND ----------
 
@@ -378,31 +443,26 @@ display(summary_df)
 
 # COMMAND ----------
 
-# Overall data quality summary
-quality_summary = [{
-    "quality_metric": "Records with Complete Data",
-    "count": bronze_table.filter(
-        bronze_table.project.isNotNull() &
-        bronze_table.page_title.isNotNull() &
-        bronze_table.view_count.isNotNull() &
-        bronze_table.access_method.isNotNull()
-    ).count(),
-    "percentage": round(
-        (bronze_table.filter(
-            bronze_table.project.isNotNull() &
-            bronze_table.page_title.isNotNull() &
-            bronze_table.view_count.isNotNull() &
-            bronze_table.access_method.isNotNull()
-        ).count() / bronze_table.count()) * 100, 2
-    )
-}, {
-    "quality_metric": "Total Records",
-    "count": bronze_table.count(),
-    "percentage": 100.0
-}]
-
-quality_summary_df = spark.createDataFrame(quality_summary)
-display(quality_summary_df)
+# MAGIC %sql
+# MAGIC -- Overall data quality summary
+# MAGIC SELECT
+# MAGIC   'Records with Complete Data' as quality_metric,
+# MAGIC   COUNT(*) as record_count,
+# MAGIC   ROUND((COUNT(*) / (SELECT COUNT(*) FROM ${bronze_table_name})) * 100, 2) as percentage
+# MAGIC FROM ${bronze_table_name}
+# MAGIC WHERE
+# MAGIC   project IS NOT NULL
+# MAGIC   AND page_title IS NOT NULL
+# MAGIC   AND view_count IS NOT NULL
+# MAGIC   AND access_method IS NOT NULL
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Total Records' as quality_metric,
+# MAGIC   COUNT(*) as record_count,
+# MAGIC   100.0 as percentage
+# MAGIC FROM ${bronze_table_name};
 
 # COMMAND ----------
 
