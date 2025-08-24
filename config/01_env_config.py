@@ -185,11 +185,17 @@ except Exception as e:
 
 # COMMAND ----------
 
+# print(dbutils.fs.ls("file:/Workspace/Users/"))
+
+# COMMAND ----------
+
+from pyspark.sql.functions import col, to_timestamp, lit, concat
+
 # Load the files list from CSV
 # Build absolute path using current user's workspace path
 current_user = dbutils.notebook.entry_point.getDbutils(
 ).notebook().getContext().userName().get()
-files_csv_path = f"/dbfs/Workspace/Users/{current_user}/churn-modeling-at-scale/config/files.csv"
+files_csv_path = f"file:/Workspace/Users/{current_user}/churn-modeling-at-scale/config/files.csv"
 
 # Read CSV with proper schema
 files_df = spark.read \
