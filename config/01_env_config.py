@@ -98,34 +98,47 @@ except Exception as e:
 # Bronze layer tables
 bronze_tables = config['tables']['bronze']
 for table_key, table_name in bronze_tables.items():
-    # Create table directory without schema - schema will be defined during first write
+    # Create empty Delta table without schema - schema will be defined during first write
     try:
-        # Just create the table location, no schema definition
-        table_location = f"{volume_path}/tables/{table_name}"
-        dbutils.fs.mkdirs(table_location)
-        print(f"Prepared bronze table location: {table_name}")
+        # Create table with minimal schema that can be easily overwritten
+        spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            temp_column STRING
+        ) USING DELTA
+        """)
+        # Immediately drop the temp column to make it truly empty
+        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+        print(f"Created empty bronze table: {table_name}")
     except Exception as e:
-        print(f"Table preparation warning for {table_name}: {e}")
+        print(f"Table creation warning for {table_name}: {e}")
 
 # Silver layer tables
 silver_tables = config['tables']['silver']
 for table_key, table_name in silver_tables.items():
     try:
-        table_location = f"{volume_path}/tables/{table_name}"
-        dbutils.fs.mkdirs(table_location)
-        print(f"Prepared silver table location: {table_name}")
+        spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            temp_column STRING
+        ) USING DELTA
+        """)
+        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+        print(f"Created empty silver table: {table_name}")
     except Exception as e:
-        print(f"Table preparation warning for {table_name}: {e}")
+        print(f"Table creation warning for {table_name}: {e}")
 
 # Gold layer tables
 gold_tables = config['tables']['gold']
 for table_key, table_name in gold_tables.items():
     try:
-        table_location = f"{volume_path}/tables/{table_name}"
-        dbutils.fs.mkdirs(table_location)
-        print(f"Prepared gold table location: {table_name}")
+        spark.sql(f"""
+        CREATE TABLE IF NOT EXISTS {table_name} (
+            temp_column STRING
+        ) USING DELTA
+        """)
+        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+        print(f"Created empty gold table: {table_name}")
     except Exception as e:
-        print(f"Table preparation warning for {table_name}: {e}")
+        print(f"Table creation warning for {table_name}: {e}")
 
 # COMMAND ----------
 
@@ -257,6 +270,7 @@ try:
         print(f"  - {volume['volumeName']}")
 except Exception as e:
     print(f"Volumes: Error listing volumes - {e}")
+    print("This is expected in some Databricks environments")
 
 # COMMAND ----------
 
