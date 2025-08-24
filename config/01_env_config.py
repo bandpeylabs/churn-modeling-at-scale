@@ -186,7 +186,10 @@ except Exception as e:
 # COMMAND ----------
 
 # Load the files list from CSV
-files_csv_path = "./config/files.csv"
+# Build absolute path using current user's workspace path
+current_user = dbutils.notebook.entry_point.getDbutils(
+).notebook().getContext().userName().get()
+files_csv_path = f"/Workspace/Repos/{current_user}/churn-modeling-at-scale/config/files.csv"
 
 # Read CSV with proper schema
 files_df = spark.read \
