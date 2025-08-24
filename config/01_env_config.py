@@ -16,7 +16,7 @@
 
 # COMMAND ----------
 
-# MAGIC %pip install -r ../requirements.txt
+# MAGIC %pip install -r ./requirements.txt
 # MAGIC dbutils.library.restartPython()
 
 # COMMAND ----------
@@ -32,7 +32,7 @@ import os
 from datetime import datetime, timedelta
 
 # Load configuration from YAML file
-with open('../config/environment.yaml', 'r') as file:
+with open('./config/environment.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
 config = config['main']
@@ -160,29 +160,19 @@ print("Environment variables set")
 
 # COMMAND ----------
 
-# Set up MLflow experiment
-ml_config = config['ml']
-experiment_name = ml_config['experiment_name']
-
-# Get current user from dbutils and build experiment path
-current_user = dbutils.notebook.entry_point.getDbutils(
-).notebook().getContext().userName().get()
-experiment_path = f"/Users/{current_user}/{experiment_name}"
-
-# Create MLflow experiment with proper error handling
 try:
     # Create experiment if it doesn't exist
-    experiment = mlflow.get_experiment_by_name(experiment_path)
+    experiment = mlflow.get_experiment_by_name(experiment_name)
     if experiment is None:
-        experiment_id = mlflow.create_experiment(experiment_path)
+        experiment_id = mlflow.create_experiment(experiment_name)
         print(
-            f"MLflow experiment created: {experiment_path} (ID: {experiment_id})")
+            f"MLflow experiment created: {experiment_name} (ID: {experiment_id})")
     else:
         print(
-            f"MLflow experiment found: {experiment_path} (ID: {experiment.experiment_id})")
+            f"MLflow experiment found: {experiment_name} (ID: {experiment.experiment_id})")
 
     # Set as active experiment
-    mlflow.set_experiment(experiment_path)
+    mlflow.set_experiment(experiment_name)
 except Exception as e:
     print(f"MLflow experiment setup warning: {e}")
     print("Continuing without MLflow experiment setup")
