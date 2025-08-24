@@ -67,7 +67,8 @@ files_to_download = urls_df.filter(
 print(f"Found {files_to_download.count()} pageviews files to download")
 
 # Limit downloads for demo (can be increased or removed for production)
-max_downloads = urls_df.count()
+# max_downloads = urls_df.count()
+max_downloads = 50
 files_to_download = files_to_download.limit(max_downloads)
 
 print(f"Starting download of {max_downloads} files")
@@ -283,43 +284,4 @@ bronze_table.select("view_count").summary().show()
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Summary
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC **Bronze layer ingestion completed successfully**
-# MAGIC
-# MAGIC **What was accomplished:**
-# MAGIC - Configuration loaded from YAML
-# MAGIC - Unity Catalog environment set up
-# MAGIC - Volume created for raw file storage
-# MAGIC - Wikimedia download URLs generated
-# MAGIC - Files downloaded using Spark native methods
-# MAGIC - Data loaded using Spark gzip support
-# MAGIC - Proper schema applied based on data structure
-# MAGIC - Data ingested into bronze table
-# MAGIC - Data quality checks completed
-# MAGIC
-# MAGIC **Bronze table details:**
-# MAGIC - **Table**: `{bronze_table_name}`
-# MAGIC - **Records**: {bronze_table.count()}
-# MAGIC - **Partitioning**: By file_date and project
-# MAGIC - **Format**: Delta Lake with ACID transactions
-# MAGIC - **Schema**: Optimized for Wikimedia pageview data
-# MAGIC
-# MAGIC **Next steps:**
-# MAGIC - Process data in Silver layer (cleaning and validation)
-# MAGIC - Create Gold layer (business-ready features)
-# MAGIC - Build ML pipeline for churn prediction
-
-# COMMAND ----------
-
-# Clean up and exit
-dbutils.notebook.exit({
-    "status": "success",
-    "bronze_table": bronze_table_name,
-    "record_count": bronze_table.count(),
-    "message": "Bronze layer ingestion completed successfully"
-})
