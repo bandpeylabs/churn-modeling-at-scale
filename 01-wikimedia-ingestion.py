@@ -259,29 +259,157 @@ bronze_table.show(5, truncate=False)
 
 # COMMAND ----------
 
-# Basic data quality checks
-print("=== Data Quality Report ===")
-
-# Check for nulls
-null_counts = {}
-for column in bronze_table.columns:
-    null_count = bronze_table.filter(f"{column} IS NULL").count()
-    null_counts[column] = null_count
-
-print("\nNull value counts:")
-for col, count in null_counts.items():
-    print(f"  {col}: {count}")
-
-# Check data distribution
-print("\nProject distribution:")
-bronze_table.groupBy("project").count().show()
-
-print("\nAccess method distribution:")
-bronze_table.groupBy("access_method").count().show()
-
-print("\nView count statistics:")
-bronze_table.select("view_count").summary().show()
+# MAGIC %md
+# MAGIC ### Null Value Analysis
 
 # COMMAND ----------
 
+# Check for nulls and create DataFrame for visualization
+null_counts_data = []
+for column in bronze_table.columns:
+    null_count = bronze_table.filter(f"{column} IS NULL").count()
+    total_count = bronze_table.count()
+    null_percentage = (null_count / total_count) * \
+        100 if total_count > 0 else 0
+    null_counts_data.append({
+        "column": column,
+        "null_count": null_count,
+        "total_count": total_count,
+        "null_percentage": round(null_percentage, 2)
+    })
 
+null_counts_df = spark.createDataFrame(null_counts_data)
+display(null_counts_df)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Project Distribution
+
+# COMMAND ----------
+
+# Project distribution for visualization
+project_distribution = bronze_table.groupBy(
+    "project").count().orderBy("count", ascending=False)
+display(project_distribution)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Access Method Distribution
+
+# COMMAND ----------
+
+# Access method distribution for visualization
+access_method_distribution = bronze_table.groupBy(
+    "access_method").count().orderBy("count", ascending=False)
+display(access_method_distribution)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### View Count Statistics
+
+# COMMAND ----------
+
+# View count statistics for visualization
+view_count_stats = bronze_table.select("view_count").summary()
+display(view_count_stats)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### File Timestamp Distribution
+
+# COMMAND ----------
+
+# File timestamp distribution for visualization
+timestamp_distribution = bronze_table.groupBy(
+    "file_timestamp").count().orderBy("file_timestamp")
+display(timestamp_distribution)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Data Volume by File
+
+# COMMAND ----------
+
+# Data volume by source file for visualization
+file_volume = bronze_table.groupBy(
+    "filename").count().orderBy("count", ascending=False)
+display(file_volume)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Summary Statistics
+
+# COMMAND ----------
+
+# Create summary DataFrame for visualization
+summary_data = [{
+    "metric": "Total Records",
+    "value": bronze_table.count()
+}, {
+    "metric": "Total Files Processed",
+    "value": bronze_table.select("filename").distinct().count()
+}, {
+    "metric": "Unique Projects",
+    "value": bronze_table.select("project").distinct().count()
+}, {
+    "metric": "Unique Page Titles",
+    "value": bronze_table.select("page_title").distinct().count()
+}, {
+    "metric": "Date Range Start",
+    "value": bronze_table.agg({"file_timestamp": "min"}).collect()[0]["min(file_timestamp)"]
+}, {
+    "metric": "Date Range End",
+    "value": bronze_table.agg({"file_timestamp": "max"}).collect()[0]["max(file_timestamp)"]
+}]
+
+summary_df = spark.createDataFrame(summary_data)
+display(summary_df)
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Data Quality Summary
+
+# COMMAND ----------
+
+# Overall data quality summary
+quality_summary = [{
+    "quality_metric": "Records with Complete Data",
+    "count": bronze_table.filter(
+        bronze_table.project.isNotNull() &
+        bronze_table.page_title.isNotNull() &
+        bronze_table.view_count.isNotNull() &
+        bronze_table.access_method.isNotNull()
+    ).count(),
+    "percentage": round(
+        (bronze_table.filter(
+            bronze_table.project.isNotNull() &
+            bronze_table.page_title.isNotNull() &
+            bronze_table.view_count.isNotNull() &
+            bronze_table.access_method.isNotNull()
+        ).count() / bronze_table.count()) * 100, 2
+    )
+}, {
+    "quality_metric": "Total Records",
+    "count": bronze_table.count(),
+    "percentage": 100.0
+}]
+
+quality_summary_df = spark.createDataFrame(quality_summary)
+display(quality_summary_df)
+
+# COMMAND ----------
+
+# Clean up and exit
+dbutils.notebook.exit({
+    "status": "success",
+    "bronze_table": bronze_table_name,
+    "record_count": bronze_table.count(),
+    "message": "Bronze layer ingestion completed successfully"
+})

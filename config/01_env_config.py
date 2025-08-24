@@ -271,6 +271,7 @@ try:
 except Exception as e:
     print(f"Volumes: Error listing volumes - {e}")
     print("This is expected in some Databricks environments")
+    print("Continuing with environment setup...")
 
 # COMMAND ----------
 
