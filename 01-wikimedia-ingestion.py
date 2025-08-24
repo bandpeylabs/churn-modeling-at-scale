@@ -35,9 +35,9 @@
 # COMMAND ----------
 
 # Import required functions for data processing
-from pyspark.sql.functions import to_timestamp
+from pyspark.sql.functions import to_timestamp, regexp_extract
 from datetime import datetime, timedelta
-from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split, to_timestamp
+from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split
 
 # COMMAND ----------
 
@@ -79,25 +79,22 @@ files_to_download = files_to_download.limit(max_downloads)
 
 print(f"Starting download of {max_downloads} files")
 
-# Download files using Spark
+# Download files directly to volume
 download_results = []
 for row in files_to_download.collect():
     filename = row['filename']
     full_url = row['full_url']
     file_size = row['file_size_bytes']
-    local_path = f"{volume_path}/{filename}"
+    volume_file_path = f"{volume_path}/{filename}"
 
     print(f"Downloading: {filename} ({file_size} bytes)")
     try:
-        # Use Spark to download file
-        spark.sparkContext.addFile(full_url)
-        # Copy from Spark temp location to volume
-        dbutils.fs.cp(
-            f"file://{spark.sparkContext.getLocalFile(filename)}", local_path)
+        # Download directly to volume using dbutils
+        dbutils.fs.cp(full_url, volume_file_path)
         download_results.append({
             'filename': filename,
             'status': 'success',
-            'local_path': local_path,
+            'volume_path': volume_file_path,
             'file_size': file_size
         })
         print(f"Downloaded: {filename}")
@@ -154,6 +151,7 @@ bronze_df = spark.read \
     .load(f"{volume_path}/*.gz")
 
 print("Files loaded using Spark native gzip support")
+print(f"Loaded {bronze_df.count()} raw records from gzipped files")
 
 # COMMAND ----------
 
@@ -172,7 +170,43 @@ parsed_df = bronze_df.select(
     current_timestamp().alias("ingestion_timestamp")
 )
 
-print("Data parsed and structured")
+# Extract filename from source_file path for joining with metadata
+parsed_df = parsed_df.withColumn(
+    "filename",
+    regexp_extract(col("source_file"), r"([^/]+\.gz)$", 1)
+)
+
+print("Data parsed and filename extracted for metadata joining")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Enrich Data with Metadata from URLs DataFrame
+
+# COMMAND ----------
+
+# Join parsed data with metadata from urls_df
+enriched_df = parsed_df.join(
+    urls_df.select("filename", "timestamp", "file_size_bytes", "full_url"),
+    on="filename",
+    how="left"
+).select(
+    col("project"),
+    col("page_title"),
+    col("view_count"),
+    col("access_method"),
+    col("source_file"),
+    col("ingestion_timestamp"),
+    col("timestamp").alias("file_timestamp"),
+    col("file_size_bytes"),
+    col("full_url").alias("source_url")
+)
+
+print("Data enriched with metadata from URLs DataFrame")
+print(f"Enriched DataFrame schema:")
+enriched_df.printSchema()
+print(f"Sample enriched data:")
+enriched_df.show(5, truncate=False)
 
 # COMMAND ----------
 
@@ -181,9 +215,9 @@ print("Data parsed and structured")
 
 # COMMAND ----------
 
-# Add metadata columns
-final_bronze_df = parsed_df.withColumn("data_source", lit("wikimedia_pageviews")) \
-                           .withColumn("file_date", lit("2025-01"))
+# Use enriched data with metadata from URLs DataFrame
+final_bronze_df = enriched_df.withColumn(
+    "data_source", lit("wikimedia_pageviews"))
 
 # Get bronze table name from config
 bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
@@ -201,7 +235,7 @@ print(f"Writing to bronze table: {bronze_table_name}")
 final_bronze_df.write \
     .format("delta") \
     .mode("overwrite") \
-    .partitionBy("file_date", "project") \
+    .partitionBy("file_timestamp", "project") \
     .saveAsTable(bronze_table_name)
 
 print(f"Bronze table created successfully: {bronze_table_name}")
