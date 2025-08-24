@@ -32,6 +32,7 @@
 # COMMAND ----------
 
 # Import required functions for data processing
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from pyspark.sql.functions import to_timestamp, regexp_extract
 from datetime import datetime, timedelta
 from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split
@@ -115,7 +116,6 @@ download_results_df.show(truncate=False)
 
 # COMMAND ----------
 
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
 wikimedia_schema = StructType([
     StructField("project", StringType(), True),
@@ -209,10 +209,12 @@ enriched_df.show(5, truncate=False)
 final_bronze_df = enriched_df.withColumn(
     "data_source", lit("wikimedia_pageviews"))
 
-# Get bronze table name from config
+# Get bronze table name and location from config
 bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
+bronze_table_location = f"{volume_path}/tables/{bronze_table_name}"
 
 print(f"Writing to bronze table: {bronze_table_name}")
+print(f"Table location: {bronze_table_location}")
 
 # COMMAND ----------
 
@@ -221,13 +223,21 @@ print(f"Writing to bronze table: {bronze_table_name}")
 
 # COMMAND ----------
 
+# Write to Delta format at the prepared location
 final_bronze_df.write \
     .format("delta") \
     .mode("overwrite") \
     .option("mergeSchema", "true") \
     .option("overwriteSchema", "true") \
     .partitionBy("file_timestamp", "project") \
-    .saveAsTable(bronze_table_name)
+    .save(bronze_table_location)
+
+# Create the table from the saved data
+spark.sql(f"""
+CREATE TABLE IF NOT EXISTS {bronze_table_name}
+USING DELTA
+LOCATION '{bronze_table_location}'
+""")
 
 print(f"Bronze table created successfully: {bronze_table_name}")
 
