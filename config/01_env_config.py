@@ -280,5 +280,10 @@ dbutils.notebook.exit({
     "status": "success",
     "config": config,
     "urls_df": urls_df,
+    "bronze_table_name": "bronze_wikimedia_pageviews",
+    "user_behavior_table": "bronze_user_behavior",
+    "subscription_table": "bronze_subscription_data",
+    "user_features_table": "silver_user_features",
+    "predictions_table": "churn_predictions",
     "message": "Environment setup completed successfully"
 })

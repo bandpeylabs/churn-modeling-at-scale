@@ -466,10 +466,124 @@ bronze_table.show(5, truncate=False)
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC ## Data Quality Verification
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Overall data quality summary
+# MAGIC SELECT
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(DISTINCT project) as unique_projects,
+# MAGIC   COUNT(DISTINCT page_title) as unique_pages,
+# MAGIC   COUNT(DISTINCT access_method) as unique_access_methods,
+# MAGIC   COUNT(DISTINCT filename) as total_files,
+# MAGIC   MIN(file_timestamp) as earliest_timestamp,
+# MAGIC   MAX(file_timestamp) as latest_timestamp
+# MAGIC FROM bronze_wikimedia_pageviews;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Project distribution analysis
+# MAGIC SELECT
+# MAGIC   project,
+# MAGIC   COUNT(*) as record_count,
+# MAGIC   ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM bronze_wikimedia_pageviews), 2) as percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC GROUP BY project
+# MAGIC ORDER BY record_count DESC
+# MAGIC LIMIT 10;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Access method distribution
+# MAGIC SELECT
+# MAGIC   access_method,
+# MAGIC   COUNT(*) as record_count,
+# MAGIC   ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM bronze_wikimedia_pageviews), 2) as percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC GROUP BY access_method
+# MAGIC ORDER BY record_count DESC;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- View count distribution analysis
+# MAGIC SELECT
+# MAGIC   'All Records' as category,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   MIN(view_count) as min_views,
+# MAGIC   MAX(view_count) as max_views,
+# MAGIC   ROUND(AVG(view_count), 2) as avg_views,
+# MAGIC   ROUND(STDDEV(view_count), 2) as stddev_views,
+# MAGIC   PERCENTILE(view_count, 0.25) as p25_views,
+# MAGIC   PERCENTILE(view_count, 0.50) as median_views,
+# MAGIC   PERCENTILE(view_count, 0.75) as p75_views,
+# MAGIC   PERCENTILE(view_count, 0.95) as p95_views,
+# MAGIC   PERCENTILE(view_count, 0.99) as p99_views
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC WHERE view_count IS NOT NULL;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Null value analysis
+# MAGIC SELECT
+# MAGIC   'project' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(project) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(project) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(project)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'page_title' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(page_title) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(page_title) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(page_title)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'view_count' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(view_count) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(view_count) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(view_count)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'access_method' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(access_method) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(access_method) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(access_method)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC ORDER BY column_name;
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Ingestion Summary
+# MAGIC
+# MAGIC **Bronze layer ingestion completed successfully** with comprehensive data quality verification.
+
+# COMMAND ----------
+
 # Clean up and exit
 dbutils.notebook.exit({
     "status": "success",
     "bronze_table": bronze_table_name,
     "record_count": bronze_table.count(),
-    "message": "Bronze layer ingestion completed successfully"
+    "message": "Bronze layer ingestion completed successfully with quality checks"
 })
