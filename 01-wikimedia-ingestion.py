@@ -33,7 +33,8 @@
 
 # Import required functions for data processing
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType
-from pyspark.sql.functions import to_timestamp, regexp_extract
+from pyspark.sql.functions import to_timestamp, regexp_extract, rand, row_number
+from pyspark.sql.window import Window
 from datetime import datetime, timedelta
 from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split
 
@@ -57,21 +58,39 @@ urls_df.show(5, truncate=False)
 
 # COMMAND ----------
 
-# Filter files to download (e.g., only pageviews files, or specific date range)
-# You can modify this filter based on your needs
-files_to_download = urls_df.filter(
+# Daily sampling strategy: Pick one random file per day during peak hours (12-16 UTC)
+# This reduces data volume significantly while maintaining daily patterns
+
+# Extract date and hour from filename for grouping
+files_with_datetime = urls_df.filter(
     (col("filename").like("pageviews-%")) &
     (col("file_size_bytes") > 0)
-).orderBy("timestamp")
+).withColumn(
+    "date", regexp_extract(col("filename"), r"pageviews-(\d{8})", 1)
+).withColumn(
+    "hour", regexp_extract(
+        col("filename"), r"pageviews-\d{8}-(\d{2})", 1).cast("int")
+).filter(
+    # Filter for peak hours (12-16 UTC) when Wikipedia traffic is typically highest
+    col("hour").between(12, 16)
+)
 
-print(f"Found {files_to_download.count()} pageviews files to download")
+print(f"Found {files_with_datetime.count()} files during peak hours (12-16 UTC)")
 
-# Limit downloads for demo (can be increased or removed for production)
-# max_downloads = urls_df.count()
-max_downloads = 50
-files_to_download = files_to_download.limit(max_downloads)
+# Group by date and pick one random file per day
+window_spec = Window.partitionBy("date").orderBy(rand(seed=42))
 
-print(f"Starting download of {max_downloads} files")
+daily_sampled_files = files_with_datetime.withColumn(
+    "row_number", row_number().over(window_spec)
+).filter(
+    col("row_number") == 1
+).drop("date", "hour", "row_number")
+
+files_to_download = daily_sampled_files.orderBy("timestamp")
+
+print(f"Daily sampling completed: {files_to_download.count()} files selected")
+print("Strategy: One random file per day during peak hours (12-16 UTC)")
+print("Expected data volume: ~1.5-2M records per file = ~45-60M total records")
 
 # Download files directly to volume
 download_results = []
