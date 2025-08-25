@@ -272,21 +272,3 @@ except Exception as e:
     print(f"Volumes: Error listing volumes - {e}")
     print("This is expected in some Databricks environments")
     print("Continuing with environment setup...")
-
-# COMMAND ----------
-
-# Store config in notebook context for other notebooks to access
-dbutils.notebook.exit({
-    "status": "success",
-    "config": config,
-    "urls_df": urls_df,
-    "bronze_table_name": "bronze_wikimedia_pageviews",
-    "user_behavior_table": "bronze_user_behavior",
-    "subscription_table": "bronze_subscription_data",
-    "user_features_table": "silver_user_features",
-    "predictions_table": "churn_predictions",
-    "feature_matrix_table": "silver_user_features",
-    "results_table": "model_results",
-    "importance_table": "feature_importance",
-    "message": "Environment setup completed successfully"
-})

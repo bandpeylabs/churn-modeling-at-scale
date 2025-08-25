@@ -273,8 +273,6 @@ bronze_table.show(5, truncate=False)
 
 # COMMAND ----------
 
-# COMMAND ----------
-
 # MAGIC %md
 # MAGIC ## Data Optimization & Partitioning
 # MAGIC
@@ -283,14 +281,14 @@ bronze_table.show(5, truncate=False)
 # COMMAND ----------
 
 # Table optimization for large-scale data
-print("Starting optimization for large-scale data (5.3B records)...")
+print("Starting optimization for large-scale data")
 
 # 1. Optimize table layout and compression
 spark.sql(f"OPTIMIZE {bronze_table_name}")
 
-# 2. Z-order clustering on frequently queried columns
+# 2. Z-order clustering on non-partition columns only
 spark.sql(
-    f"OPTIMIZE {bronze_table_name} ZORDER BY (project, access_method, view_count)")
+    f"OPTIMIZE {bronze_table_name} ZORDER BY (access_method, view_count)")
 
 # 3. Vacuum old files (retain 7 days for safety)
 spark.sql(f"VACUUM {bronze_table_name} RETAIN 168 HOURS")
@@ -327,15 +325,3 @@ partition_stats = spark.sql(f"""
 
 print("\nTop 10 partitions by record count:")
 partition_stats.show()
-
-# COMMAND ----------
-
-# Clean up and exit
-dbutils.notebook.exit({
-    "status": "success",
-    "bronze_table": bronze_table_name,
-    "record_count": bronze_table.count(),
-    "optimized": True,
-    "partition_columns": ["file_timestamp", "project"],
-    "message": "Bronze layer ingestion and optimization completed successfully"
-})
