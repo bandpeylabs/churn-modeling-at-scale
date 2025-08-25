@@ -35,7 +35,7 @@
 # MAGIC   COUNT(DISTINCT project) as unique_projects,
 # MAGIC   COUNT(DISTINCT page_title) as unique_pages,
 # MAGIC   COUNT(DISTINCT access_method) as unique_access_methods,
-# MAGIC   COUNT(DISTINCT filename) as total_files,
+# MAGIC   COUNT(DISTINCT source_file) as total_files,
 # MAGIC   MIN(file_timestamp) as earliest_timestamp,
 # MAGIC   MAX(file_timestamp) as latest_timestamp
 # MAGIC FROM bronze_wikimedia_pageviews;
@@ -286,7 +286,7 @@ print(f"Total records: {bronze_df.count():,}")
 
 # MAGIC %md
 # MAGIC ## 2. Generate Synthetic User Behavior Data
-
+# MAGIC
 # MAGIC Since Wikimedia data doesn't contain user behavior patterns needed for churn modeling, we'll generate realistic synthetic data that mimics subscription service patterns.
 
 # COMMAND ----------
@@ -633,7 +633,7 @@ print(f"Subscription data written to: {subscription_table}")
 
 # MAGIC %md
 # MAGIC ## 5. Data Quirks & Mitigation Strategies
-
+# MAGIC
 # MAGIC Based on our analysis, we've identified several data quirks and implemented mitigation strategies:
 
 # COMMAND ----------
