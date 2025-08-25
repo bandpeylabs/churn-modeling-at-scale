@@ -254,10 +254,69 @@ bronze_table.show(5, truncate=False)
 
 # COMMAND ----------
 
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Data Optimization & Partitioning
+# MAGIC
+# MAGIC With 5.3 billion records, we need to optimize the table for performance and efficient querying.
+
+# COMMAND ----------
+
+# Table optimization for large-scale data
+print("Starting optimization for large-scale data (5.3B records)...")
+
+# 1. Optimize table layout and compression
+spark.sql(f"OPTIMIZE {bronze_table_name}")
+
+# 2. Z-order clustering on frequently queried columns
+spark.sql(
+    f"OPTIMIZE {bronze_table_name} ZORDER BY (project, access_method, view_count)")
+
+# 3. Vacuum old files (retain 7 days for safety)
+spark.sql(f"VACUUM {bronze_table_name} RETAIN 168 HOURS")
+
+# 4. Update table statistics for query optimization
+spark.sql(f"ANALYZE TABLE {bronze_table_name} COMPUTE STATISTICS")
+spark.sql(
+    f"ANALYZE TABLE {bronze_table_name} COMPUTE STATISTICS FOR ALL COLUMNS")
+
+print("Table optimization completed")
+
+# COMMAND ----------
+
+# Verify optimization results
+optimized_files = spark.sql(
+    f"DESCRIBE DETAIL {bronze_table_name}").collect()[0]
+print(f"Optimized table details:")
+print(f"Number of files: {optimized_files['numFiles']}")
+print(f"Size in bytes: {optimized_files['sizeInBytes']:,}")
+print(f"Partitioning columns: {optimized_files['partitionColumns']}")
+
+# Show sample partition distribution
+partition_stats = spark.sql(f"""
+    SELECT 
+        file_timestamp,
+        project,
+        COUNT(*) as record_count,
+        COUNT(*) * 100.0 / (SELECT COUNT(*) FROM {bronze_table_name}) as percentage
+    FROM {bronze_table_name}
+    GROUP BY file_timestamp, project
+    ORDER BY record_count DESC
+    LIMIT 10
+""")
+
+print("\nTop 10 partitions by record count:")
+partition_stats.show()
+
+# COMMAND ----------
+
 # Clean up and exit
 dbutils.notebook.exit({
     "status": "success",
     "bronze_table": bronze_table_name,
     "record_count": bronze_table.count(),
-    "message": "Bronze layer ingestion completed successfully"
+    "optimized": True,
+    "partition_columns": ["file_timestamp", "project"],
+    "message": "Bronze layer ingestion and optimization completed successfully"
 })
