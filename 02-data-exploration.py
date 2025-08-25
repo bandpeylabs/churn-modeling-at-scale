@@ -56,18 +56,6 @@
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC -- Access method distribution
-# MAGIC SELECT
-# MAGIC   access_method,
-# MAGIC   COUNT(*) as record_count,
-# MAGIC   ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM bronze_wikimedia_pageviews), 2) as percentage
-# MAGIC FROM bronze_wikimedia_pageviews
-# MAGIC GROUP BY access_method
-# MAGIC ORDER BY record_count DESC;
-
-# COMMAND ----------
-
-# MAGIC %sql
 # MAGIC -- View count distribution analysis
 # MAGIC SELECT
 # MAGIC   'All Records' as category,
@@ -134,42 +122,42 @@
 # MAGIC -- Summary statistics overview
 # MAGIC SELECT
 # MAGIC   'Total Records' as metric,
-# MAGIC   COUNT(*) as value
+# MAGIC   CAST(COUNT(*) AS STRING) as value
 # MAGIC FROM bronze_wikimedia_pageviews
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
 # MAGIC SELECT
 # MAGIC   'Total Files Processed' as metric,
-# MAGIC   COUNT(DISTINCT filename) as value
+# MAGIC   CAST(COUNT(DISTINCT source_file) AS STRING) as value
 # MAGIC FROM bronze_wikimedia_pageviews
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
 # MAGIC SELECT
 # MAGIC   'Unique Projects' as metric,
-# MAGIC   COUNT(DISTINCT project) as value
+# MAGIC   CAST(COUNT(DISTINCT project) AS STRING) as value
 # MAGIC FROM bronze_wikimedia_pageviews
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
 # MAGIC SELECT
 # MAGIC   'Unique Page Titles' as metric,
-# MAGIC   COUNT(DISTINCT page_title) as value
+# MAGIC   CAST(COUNT(DISTINCT page_title) AS STRING) as value
 # MAGIC FROM bronze_wikimedia_pageviews
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
 # MAGIC SELECT
 # MAGIC   'Date Range Start' as metric,
-# MAGIC   MIN(file_timestamp) as value
+# MAGIC   CAST(MIN(file_timestamp) AS STRING) as value
 # MAGIC FROM bronze_wikimedia_pageviews
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
 # MAGIC SELECT
 # MAGIC   'Date Range End' as metric,
-# MAGIC   MAX(file_timestamp) as value
+# MAGIC   CAST(MAX(file_timestamp) AS STRING) as value
 # MAGIC FROM bronze_wikimedia_pageviews;
 
 # COMMAND ----------
