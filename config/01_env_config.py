@@ -285,5 +285,8 @@ dbutils.notebook.exit({
     "subscription_table": "bronze_subscription_data",
     "user_features_table": "silver_user_features",
     "predictions_table": "churn_predictions",
+    "feature_matrix_table": "silver_user_features",
+    "results_table": "model_results",
+    "importance_table": "feature_importance",
     "message": "Environment setup completed successfully"
 })

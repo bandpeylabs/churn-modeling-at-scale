@@ -138,7 +138,7 @@ print(f"Subscription data loaded: {subscription_df.count():,} records")
 # MAGIC     COUNT(*) as actions_per_session,
 # MAGIC     SUM(COALESCE(duration_seconds, 0)) as session_duration_seconds,
 # MAGIC     MAX(timestamp) - MIN(timestamp) as session_time_span
-# MAGIC   FROM ${user_behavior_table}
+# MAGIC   FROM bronze_user_behavior
 # MAGIC   WHERE session_id IS NOT NULL
 # MAGIC   GROUP BY user_id, session_id
 # MAGIC )
@@ -167,7 +167,7 @@ print(f"Subscription data loaded: {subscription_df.count():,} records")
 # MAGIC     COUNT(DISTINCT feature_name) as features_used,
 # MAGIC     COUNT(CASE WHEN action_type = 'feature_use' THEN 1 END) as total_feature_uses,
 # MAGIC     COUNT(CASE WHEN action_type = 'feature_use' THEN 1 END) * 100.0 / COUNT(*) as feature_usage_ratio
-# MAGIC   FROM ${user_behavior_table}
+# MAGIC   FROM bronze_user_behavior
 # MAGIC   WHERE feature_name IS NOT NULL
 # MAGIC   GROUP BY user_id
 # MAGIC )
@@ -283,7 +283,7 @@ engagement_features.show(5)
 # MAGIC     WHEN DATEDIFF(CURRENT_DATE(), subscription_start) <= 90 THEN 'early'
 # MAGIC     ELSE 'established'
 # MAGIC   END as subscription_stage
-# MAGIC FROM ${subscription_table}
+# MAGIC FROM bronze_subscription_data
 # MAGIC LIMIT 10;
 
 # COMMAND ----------
@@ -448,7 +448,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC   PERCENTILE(total_actions, 0.50) as median_value,
 # MAGIC   PERCENTILE(total_actions, 0.75) as p75_value,
 # MAGIC   PERCENTILE(total_actions, 0.95) as p95_value
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
@@ -463,7 +463,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC   PERCENTILE(features_adopted, 0.50) as median_value,
 # MAGIC   PERCENTILE(features_adopted, 0.75) as p75_value,
 # MAGIC   PERCENTILE(features_adopted, 0.95) as p95_value
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
@@ -478,7 +478,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC   PERCENTILE(subscription_length_days, 0.50) as median_value,
 # MAGIC   PERCENTILE(subscription_length_days, 0.75) as p75_value,
 # MAGIC   PERCENTILE(subscription_length_days, 0.95) as p95_value
-# MAGIC FROM ${feature_matrix_table};
+# MAGIC FROM silver_user_features;
 
 # COMMAND ----------
 
@@ -490,7 +490,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC SELECT
 # MAGIC   'total_actions' as feature_name,
 # MAGIC   ROUND(CORR(total_actions, is_churned), 4) as correlation_with_churn
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC WHERE is_churned IS NOT NULL
 # MAGIC
 # MAGIC UNION ALL
@@ -498,7 +498,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC SELECT
 # MAGIC   'features_adopted' as feature_name,
 # MAGIC   ROUND(CORR(features_adopted, is_churned), 4) as correlation_with_churn
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC WHERE is_churned IS NOT NULL
 # MAGIC
 # MAGIC UNION ALL
@@ -506,7 +506,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC SELECT
 # MAGIC   'avg_actions_per_session' as feature_name,
 # MAGIC   ROUND(CORR(avg_actions_per_session, is_churn), 4) as correlation_with_churn
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC WHERE is_churned IS NOT NULL
 # MAGIC
 # MAGIC UNION ALL
@@ -514,7 +514,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC SELECT
 # MAGIC   'support_ticket_ratio' as feature_name,
 # MAGIC   ROUND(CORR(support_ticket_ratio, is_churn), 4) as correlation_with_churn
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC WHERE is_churned IS NOT NULL
 # MAGIC
 # MAGIC UNION ALL
@@ -522,7 +522,7 @@ feature_matrix.show(5, truncate=False)
 # MAGIC SELECT
 # MAGIC   'subscription_length_days' as feature_name,
 # MAGIC   ROUND(CORR(subscription_length_days, is_churn), 4) as correlation_with_churn
-# MAGIC FROM ${feature_matrix_table}
+# MAGIC FROM silver_user_features
 # MAGIC WHERE is_churned IS NOT NULL
 # MAGIC
 # MAGIC ORDER BY ABS(correlation_with_churn) DESC;
@@ -557,7 +557,7 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 # MAGIC   SUM(CASE WHEN is_churned = true THEN 1 ELSE 0 END) as churned_users,
 # MAGIC   SUM(CASE WHEN is_churned = false THEN 1 ELSE 0 END) as active_users,
 # MAGIC   ROUND(SUM(CASE WHEN is_churned = true THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) as churn_rate_percentage
-# MAGIC FROM ${user_features_table};
+# MAGIC FROM silver_user_features;
 
 # COMMAND ----------
 
@@ -569,7 +569,7 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 # MAGIC   COUNT(total_actions) as non_null_count,
 # MAGIC   COUNT(*) - COUNT(total_actions) as null_count,
 # MAGIC   ROUND(((COUNT(*) - COUNT(total_actions)) / COUNT(*)) * 100, 2) as null_percentage
-# MAGIC FROM ${user_features_table}
+# MAGIC FROM silver_user_features
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
@@ -579,7 +579,7 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 # MAGIC   COUNT(features_adopted) as non_null_count,
 # MAGIC   COUNT(*) - COUNT(features_adopted) as null_count,
 # MAGIC   ROUND(((COUNT(*) - COUNT(features_adopted)) / COUNT(*)) * 100, 2) as null_percentage
-# MAGIC FROM ${user_features_table}
+# MAGIC FROM silver_user_features
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
@@ -589,7 +589,7 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 # MAGIC   COUNT(subscription_length_days) as non_null_count,
 # MAGIC   COUNT(*) - COUNT(subscription_length_days) as null_count,
 # MAGIC   ROUND(((COUNT(*) - COUNT(subscription_length_days)) / COUNT(*)) * 100, 2) as null_percentage
-# MAGIC FROM ${user_features_table}
+# MAGIC FROM silver_user_features
 # MAGIC
 # MAGIC ORDER BY feature_name;
 
@@ -605,7 +605,7 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 # MAGIC   COUNT(*) as user_count,
 # MAGIC   COUNT(*) as feature_count,
 # MAGIC   'Ready for modeling' as status
-# MAGIC FROM ${user_features_table}
+# MAGIC FROM silver_user_features
 # MAGIC
 # MAGIC UNION ALL
 # MAGIC
@@ -614,7 +614,7 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 # MAGIC   SUM(CASE WHEN is_churned = true THEN 1 ELSE 0 END) as churned_count,
 # MAGIC   SUM(CASE WHEN is_churned = false THEN 1 ELSE 0 END) as active_count,
 # MAGIC   CONCAT(ROUND(SUM(CASE WHEN is_churned = true THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2), '%') as churn_rate
-# MAGIC FROM ${user_features_table};
+# MAGIC FROM silver_user_features;
 
 # COMMAND ----------
 

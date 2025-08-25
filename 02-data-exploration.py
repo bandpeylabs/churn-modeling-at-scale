@@ -17,45 +17,14 @@
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Data Exploration Overview
+# MAGIC ## 1. Data Quality Checks
 # MAGIC
-# MAGIC We'll explore the Wikimedia data to understand patterns, then generate synthetic user behavior data that mimics real subscription service patterns for churn modeling.
-
-# COMMAND ----------
-
-# Import required libraries
-from pyspark.sql.functions import *
-from pyspark.sql.types import *
-from pyspark.sql.window import Window
-import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
-import matplotlib.pyplot as plt
-import seaborn as sns
+# MAGIC First, let's verify the quality of the ingested Wikimedia data from the bronze layer.
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 1. Wikimedia Data Analysis
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Load Bronze Layer Data
-
-# COMMAND ----------
-
-# Load the bronze table
-bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
-bronze_df = spark.table(bronze_table_name)
-
-print(f"Bronze table loaded: {bronze_table_name}")
-print(f"Total records: {bronze_df.count():,}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Data Quality Assessment
+# MAGIC ### Overall Data Quality Summary
 
 # COMMAND ----------
 
@@ -95,6 +64,174 @@ print(f"Total records: {bronze_df.count():,}")
 # MAGIC FROM bronze_wikimedia_pageviews
 # MAGIC GROUP BY access_method
 # MAGIC ORDER BY record_count DESC;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- View count distribution analysis
+# MAGIC SELECT
+# MAGIC   'All Records' as category,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   MIN(view_count) as min_views,
+# MAGIC   MAX(view_count) as max_views,
+# MAGIC   ROUND(AVG(view_count), 2) as avg_views,
+# MAGIC   ROUND(STDDEV(view_count), 2) as stddev_views,
+# MAGIC   PERCENTILE(view_count, 0.25) as p25_views,
+# MAGIC   PERCENTILE(view_count, 0.50) as median_views,
+# MAGIC   PERCENTILE(view_count, 0.75) as p75_views,
+# MAGIC   PERCENTILE(view_count, 0.95) as p95_views,
+# MAGIC   PERCENTILE(view_count, 0.99) as p99_views
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC WHERE view_count IS NOT NULL;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Null value analysis
+# MAGIC SELECT
+# MAGIC   'project' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(project) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(project) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(project)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'page_title' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(page_title) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(page_title) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(page_title)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'view_count' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(view_count) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(view_count) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(view_count)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'access_method' as column_name,
+# MAGIC   COUNT(*) as total_records,
+# MAGIC   COUNT(access_method) as non_null_count,
+# MAGIC   COUNT(*) - COUNT(access_method) as null_count,
+# MAGIC   ROUND(((COUNT(*) - COUNT(access_method)) / COUNT(*)) * 100, 2) as null_percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC ORDER BY column_name;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Summary statistics overview
+# MAGIC SELECT
+# MAGIC   'Total Records' as metric,
+# MAGIC   COUNT(*) as value
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Total Files Processed' as metric,
+# MAGIC   COUNT(DISTINCT filename) as value
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Unique Projects' as metric,
+# MAGIC   COUNT(DISTINCT project) as value
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Unique Page Titles' as metric,
+# MAGIC   COUNT(DISTINCT page_title) as value
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Date Range Start' as metric,
+# MAGIC   MIN(file_timestamp) as value
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Date Range End' as metric,
+# MAGIC   MAX(file_timestamp) as value
+# MAGIC FROM bronze_wikimedia_pageviews;
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- Overall data quality summary
+# MAGIC SELECT
+# MAGIC   'Records with Complete Data' as quality_metric,
+# MAGIC   COUNT(*) as record_count,
+# MAGIC   ROUND((COUNT(*) / (SELECT COUNT(*) FROM bronze_wikimedia_pageviews)) * 100, 2) as percentage
+# MAGIC FROM bronze_wikimedia_pageviews
+# MAGIC WHERE
+# MAGIC   project IS NOT NULL
+# MAGIC   AND page_title IS NOT NULL
+# MAGIC   AND view_count IS NOT NULL
+# MAGIC   AND access_method IS NOT NULL
+# MAGIC
+# MAGIC UNION ALL
+# MAGIC
+# MAGIC SELECT
+# MAGIC   'Total Records' as quality_metric,
+# MAGIC   COUNT(*) as record_count,
+# MAGIC   100.0 as percentage
+# MAGIC FROM bronze_wikimedia_pageviews;
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 2. Data Exploration Overview
+# MAGIC
+# MAGIC We'll explore the Wikimedia data to understand patterns, then generate synthetic user behavior data that mimics real subscription service patterns for churn modeling.
+
+# COMMAND ----------
+
+# Import required libraries
+from pyspark.sql.functions import *
+from pyspark.sql.types import *
+from pyspark.sql.window import Window
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## 3. Wikimedia Data Analysis
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Load Bronze Layer Data
+
+# COMMAND ----------
+
+# Load the bronze table
+bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
+bronze_df = spark.table(bronze_table_name)
+
+print(f"Bronze table loaded: {bronze_table_name}")
+print(f"Total records: {bronze_df.count():,}")
 
 # COMMAND ----------
 
