@@ -1,5 +1,14 @@
 # Churn Modeling at Scale - Databricks Project
 
+[![Databricks](https://img.shields.io/badge/Databricks-FF3621?style=for-the-badge&logo=databricks&logoColor=white)](https://databricks.com/)
+[![Apache Spark](https://img.shields.io/badge/Apache%20Spark-E25A1C?style=for-the-badge&logo=apache-spark&logoColor=white)](https://spark.apache.org/)
+[![Delta Lake](https://img.shields.io/badge/Delta%20Lake-003366?style=for-the-badge&logo=delta&logoColor=white)](https://delta.io/)
+[![MLflow](https://img.shields.io/badge/MLflow-0194E2?style=for-the-badge&logo=mlflow&logoColor=white)](https://mlflow.org/)
+[![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org/)
+[![Unity Catalog](https://img.shields.io/badge/Unity%20Catalog-FF3621?style=for-the-badge&logo=databricks&logoColor=white)](https://databricks.com/product/unity-catalog)
+
+![Churn Modeling Architecture](diagrams/diagram.png)
+
 ## Project Overview
 
 This project demonstrates end-to-end churn modeling capabilities using Databricks, transforming raw behavioral logs into trusted insights, predictive services, and executive-caliber narratives that shape product and marketing strategy.
