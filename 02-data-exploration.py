@@ -205,44 +205,6 @@ import seaborn as sns
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## 3. Wikimedia Data Analysis
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ### Load Bronze Layer Data
-
-# COMMAND ----------
-
-# Load the bronze table
-bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
-bronze_df = spark.table(bronze_table_name)
-
-print(f"Bronze table loaded: {bronze_table_name}")
-print(f"Total records: {bronze_df.count():,}")
-
-# COMMAND ----------
-
-# MAGIC %sql
-# MAGIC -- View count distribution analysis
-# MAGIC SELECT
-# MAGIC   'All Records' as category,
-# MAGIC   COUNT(*) as total_records,
-# MAGIC   MIN(view_count) as min_views,
-# MAGIC   MAX(view_count) as max_views,
-# MAGIC   ROUND(AVG(view_count), 2) as avg_views,
-# MAGIC   ROUND(STDDEV(view_count), 2) as stddev_views,
-# MAGIC   PERCENTILE(view_count, 0.25) as p25_views,
-# MAGIC   PERCENTILE(view_count, 0.50) as median_views,
-# MAGIC   PERCENTILE(view_count, 0.75) as p75_views,
-# MAGIC   PERCENTILE(view_count, 0.95) as p95_views,
-# MAGIC   PERCENTILE(view_count, 0.99) as p99_views
-# MAGIC FROM bronze_wikimedia_pageviews
-# MAGIC WHERE view_count IS NOT NULL;
-
-# COMMAND ----------
-
-# MAGIC %md
 # MAGIC ### Seasonality and Temporal Patterns
 
 # COMMAND ----------
@@ -273,6 +235,20 @@ print(f"Total records: {bronze_df.count():,}")
 # COMMAND ----------
 
 # MAGIC %md
+# MAGIC ### Load Bronze Layer Data
+
+# COMMAND ----------
+
+# Load the bronze table
+bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
+bronze_df = spark.table(bronze_table_name)
+
+print(f"Bronze table loaded: {bronze_table_name}")
+print(f"Total records: {bronze_df.count():,}")
+
+# COMMAND ----------
+
+# MAGIC %md
 # MAGIC ## 2. Generate Synthetic User Behavior Data
 # MAGIC
 # MAGIC Since Wikimedia data doesn't contain user behavior patterns needed for churn modeling, we'll generate realistic synthetic data that mimics subscription service patterns.
@@ -284,7 +260,8 @@ print(f"Total records: {bronze_df.count():,}")
 
 # COMMAND ----------
 
-# Define schema for synthetic user behavior data
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType, IntegerType# Define schema for synthetic user behavior data
+
 user_behavior_schema = StructType([
     StructField("user_id", StringType(), False),
     StructField("timestamp", TimestampType(), False),
@@ -307,93 +284,83 @@ print("User behavior schema defined")
 
 # COMMAND ----------
 
-# Generate synthetic user behavior data
+from datetime import datetime, timedelta
+from pyspark.sql.types import (
+    StructType, StructField, StringType, TimestampType, IntegerType
+)
 
+user_behavior_schema = StructType([
+    StructField("user_id", StringType(), False),
+    StructField("timestamp", TimestampType(), False),
+    StructField("session_id", StringType(), True),
+    StructField("action_type", StringType(), False),
+    StructField("feature_name", StringType(), True),
+    StructField("duration_seconds", IntegerType(), True),
+    StructField("page_url", StringType(), True),
+    StructField("device_type", StringType(), True),
+    StructField("location", StringType(), True)
+])
 
-def generate_synthetic_user_behavior(num_users=10000, days=90):
-    """Generate realistic synthetic user behavior data"""
-
-    # User base characteristics
-    user_ids = [f"user_{i:06d}" for i in range(num_users)]
-
-    # Feature adoption patterns
-    features = ['dashboard', 'analytics', 'reports',
-                'integrations', 'api_access', 'support_portal']
-
-    # Device types
+def generate_user_records(user_id, days=90):
+    import numpy as np
+    features = ['dashboard', 'analytics', 'reports', 'integrations', 'api_access', 'support_portal']
     devices = ['desktop', 'mobile', 'tablet']
-
-    # Locations
     locations = ['US', 'EU', 'APAC', 'LATAM']
-
-    # Action types
     actions = ['login', 'page_view', 'feature_use', 'support_ticket']
-
-    # Generate data
     records = []
     base_date = datetime.now() - timedelta(days=days)
-
-    for user_id in user_ids:
-        # User engagement pattern (some users more active than others)
-        engagement_level = np.random.choice(
-            ['high', 'medium', 'low'], p=[0.2, 0.5, 0.3])
-
-        if engagement_level == 'high':
-            sessions_per_day = np.random.poisson(3)
-        elif engagement_level == 'medium':
-            sessions_per_day = np.random.poisson(1.5)
-        else:
-            sessions_per_day = np.random.poisson(0.5)
-
-        # Generate sessions for this user
-        for day in range(days):
-            if np.random.random() < 0.7:  # 70% chance of activity each day
-                for session in range(sessions_per_day):
-                    session_start = base_date + \
-                        timedelta(days=day, hours=np.random.randint(0, 24))
-                    session_id = f"{user_id}_{day}_{session}"
-
-                    # Generate actions within session
-                    num_actions = np.random.poisson(5) + 1
-                    for action_idx in range(num_actions):
-                        action_time = session_start + \
-                            timedelta(minutes=action_idx *
-                                      np.random.randint(1, 10))
-
-                        action_type = np.random.choice(
-                            actions, p=[0.3, 0.4, 0.25, 0.05])
-
-                        if action_type == 'feature_use':
-                            feature_name = np.random.choice(features)
-                        else:
-                            feature_name = None
-
-                        duration = np.random.randint(10, 300) if action_type in [
-                            'page_view', 'feature_use'] else None
-
-                        records.append({
-                            'user_id': user_id,
-                            'timestamp': action_time,
-                            'session_id': session_id,
-                            'action_type': action_type,
-                            'feature_name': feature_name,
-                            'duration_seconds': duration,
-                            'page_url': f"/{action_type}/{np.random.randint(1, 100)}" if action_type == 'page_view' else None,
-                            'device_type': np.random.choice(devices, p=[0.6, 0.3, 0.1]),
-                            'location': np.random.choice(locations, p=[0.4, 0.3, 0.2, 0.1])
-                        })
-
+    engagement_level = str(np.random.choice(['high', 'medium', 'low'], p=[0.2, 0.5, 0.3]))
+    if engagement_level == 'high':
+        sessions_per_day = int(np.random.poisson(3))
+    elif engagement_level == 'medium':
+        sessions_per_day = int(np.random.poisson(1.5))
+    else:
+        sessions_per_day = int(np.random.poisson(0.5))
+    for day in range(days):
+        if float(np.random.random()) < 0.7:
+            for session in range(sessions_per_day):
+                session_start = base_date + timedelta(
+                    days=day,
+                    hours=int(np.random.randint(0, 24))
+                )
+                session_id = f"{user_id}_{day}_{session}"
+                num_actions = int(np.random.poisson(5)) + 1
+                for action_idx in range(num_actions):
+                    action_time = session_start + timedelta(
+                        minutes=int(action_idx * int(np.random.randint(1, 10)))
+                    )
+                    action_type = str(np.random.choice(actions, p=[0.3, 0.4, 0.25, 0.05]))
+                    feature_name = str(np.random.choice(features)) if action_type == 'feature_use' else None
+                    duration = int(np.random.randint(10, 300)) if action_type in ['page_view', 'feature_use'] else None
+                    page_url = f"/{action_type}/{int(np.random.randint(1, 100))}" if action_type == 'page_view' else None
+                    device_type = str(np.random.choice(devices, p=[0.6, 0.3, 0.1]))
+                    location = str(np.random.choice(locations, p=[0.4, 0.3, 0.2, 0.1]))
+                    records.append((
+                        str(user_id),
+                        action_time,
+                        session_id,
+                        action_type,
+                        feature_name,
+                        duration,
+                        page_url,
+                        device_type,
+                        location
+                    ))
     return records
 
+num_users = 10000
+user_ids = [f"user_{i:06d}" for i in range(num_users)]
 
-# Generate the data
-print("Generating synthetic user behavior data...")
-synthetic_data = generate_synthetic_user_behavior(num_users=10000, days=90)
-print(f"Generated {len(synthetic_data):,} records")
+rdd = spark.sparkContext.parallelize(
+    user_ids,
+    numSlices=100
+).flatMap(generate_user_records)
+user_behavior_df = spark.createDataFrame(
+    rdd,
+    schema=user_behavior_schema
+)
 
-# Convert to Spark DataFrame
-user_behavior_df = spark.createDataFrame(synthetic_data, user_behavior_schema)
-print(f"Created Spark DataFrame with {user_behavior_df.count():,} records")
+display(user_behavior_df)
 
 # COMMAND ----------
 
@@ -402,7 +369,8 @@ print(f"Created Spark DataFrame with {user_behavior_df.count():,} records")
 
 # COMMAND ----------
 
-# Define schema for subscription data
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType, BooleanType# Define schema for subscription data
+
 subscription_schema = StructType([
     StructField("user_id", StringType(), False),
     StructField("subscription_start", TimestampType(), False),
@@ -418,8 +386,8 @@ print("Subscription schema defined")
 
 # COMMAND ----------
 
-# Generate synthetic subscription data
-
+import numpy as np
+from datetime import datetime, timedelta
 
 def generate_synthetic_subscriptions(user_behavior_df, churn_rate=0.15):
     """Generate subscription data based on user behavior patterns"""
@@ -430,43 +398,35 @@ def generate_synthetic_subscriptions(user_behavior_df, churn_rate=0.15):
 
     # Subscription characteristics
     plan_types = ['basic', 'pro', 'enterprise']
-    plan_weights = [0.5, 0.35, 0.15]  # 50% basic, 35% pro, 15% enterprise
+    plan_weights = [0.5, 0.35, 0.15]
 
     billing_cycles = ['monthly', 'annual']
-    billing_weights = [0.7, 0.3]  # 70% monthly, 30% annual
+    billing_weights = [0.7, 0.3]
 
     payment_methods = ['credit_card', 'paypal', 'bank_transfer']
     payment_weights = [0.6, 0.3, 0.1]
 
-    churn_reasons = ['price', 'features', 'support',
-                     'competitor', 'no_longer_needed', None]
+    churn_reasons = ['price', 'features', 'support', 'competitor', 'no_longer_needed', None]
     churn_reason_weights = [0.25, 0.2, 0.15, 0.1, 0.2, 0.1]
 
     records = []
     base_date = datetime.now() - timedelta(days=90)
 
     for user_id in user_ids:
-        # Subscription start date (random within last 90 days)
         start_days_ago = np.random.randint(0, 90)
         subscription_start = base_date + timedelta(days=start_days_ago)
 
-        # Plan and billing selection
         plan_type = np.random.choice(plan_types, p=plan_weights)
         billing_cycle = np.random.choice(billing_cycles, p=billing_weights)
         payment_method = np.random.choice(payment_methods, p=payment_weights)
 
-        # Determine if user churned
         is_churned = np.random.random() < churn_rate
 
         if is_churned:
-            # Churned users - subscription ended
-            subscription_length = np.random.randint(7, 90)  # 7-90 days
-            subscription_end = subscription_start + \
-                timedelta(days=subscription_length)
-            churn_reason = np.random.choice(
-                churn_reasons, p=churn_reason_weights)
+            subscription_length = np.random.randint(7, 90)
+            subscription_end = subscription_start + timedelta(days=subscription_length)
+            churn_reason = np.random.choice(churn_reasons, p=churn_reason_weights)
         else:
-            # Active users - no end date
             subscription_end = None
             churn_reason = None
 
@@ -483,17 +443,14 @@ def generate_synthetic_subscriptions(user_behavior_df, churn_rate=0.15):
 
     return records
 
-
 # Generate subscription data
 print("Generating synthetic subscription data...")
-subscription_data = generate_synthetic_subscriptions(
-    user_behavior_df, churn_rate=0.15)
+subscription_data = generate_synthetic_subscriptions(user_behavior_df, churn_rate=0.15)
 print(f"Generated {len(subscription_data):,} subscription records")
 
 # Convert to Spark DataFrame
 subscription_df = spark.createDataFrame(subscription_data, subscription_schema)
-print(
-    f"Created subscription DataFrame with {subscription_df.count():,} records")
+display(user_behavior_df)
 
 # COMMAND ----------
 

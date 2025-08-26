@@ -98,17 +98,17 @@ except Exception as e:
 # Bronze layer tables
 bronze_tables = config['tables']['bronze']
 for table_key, table_name in bronze_tables.items():
-    # Create empty Delta table without schema - schema will be defined during first write
     try:
-        # Create table with minimal schema that can be easily overwritten
-        spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            temp_column STRING
-        ) USING DELTA
-        """)
-        # Immediately drop the temp column to make it truly empty
-        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
-        print(f"Created empty bronze table: {table_name}")
+        if not spark._jsparkSession.catalog().tableExists(table_name):
+            spark.sql(f"""
+            CREATE TABLE {table_name} (
+                temp_column STRING
+            ) USING DELTA
+            """)
+            spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+            print(f"Created empty bronze table: {table_name}")
+        else:
+            print(f"Bronze table already exists, skipping: {table_name}")
     except Exception as e:
         print(f"Table creation warning for {table_name}: {e}")
 
@@ -116,13 +116,16 @@ for table_key, table_name in bronze_tables.items():
 silver_tables = config['tables']['silver']
 for table_key, table_name in silver_tables.items():
     try:
-        spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            temp_column STRING
-        ) USING DELTA
-        """)
-        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
-        print(f"Created empty silver table: {table_name}")
+        if not spark._jsparkSession.catalog().tableExists(table_name):
+            spark.sql(f"""
+            CREATE TABLE {table_name} (
+                temp_column STRING
+            ) USING DELTA
+            """)
+            spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+            print(f"Created empty silver table: {table_name}")
+        else:
+            print(f"Silver table already exists, skipping: {table_name}")
     except Exception as e:
         print(f"Table creation warning for {table_name}: {e}")
 
@@ -130,13 +133,16 @@ for table_key, table_name in silver_tables.items():
 gold_tables = config['tables']['gold']
 for table_key, table_name in gold_tables.items():
     try:
-        spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            temp_column STRING
-        ) USING DELTA
-        """)
-        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
-        print(f"Created empty gold table: {table_name}")
+        if not spark._jsparkSession.catalog().tableExists(table_name):
+            spark.sql(f"""
+            CREATE TABLE {table_name} (
+                temp_column STRING
+            ) USING DELTA
+            """)
+            spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+            print(f"Created empty gold table: {table_name}")
+        else:
+            print(f"Gold table already exists, skipping: {table_name}")
     except Exception as e:
         print(f"Table creation warning for {table_name}: {e}")
 
