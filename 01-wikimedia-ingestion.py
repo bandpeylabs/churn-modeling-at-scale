@@ -1,17 +1,8 @@
 # Databricks notebook source
 # MAGIC %md
-# MAGIC # Wikimedia Pageview Data Ingestion
+# MAGIC # Wikimedia Data Ingestion
 # MAGIC
-# MAGIC **Purpose**: Download, unzip, and ingest raw Wikimedia pageview data into Bronze layer using Spark-native approaches
-# MAGIC
-# MAGIC **Data Source**: Wikimedia pageviews dump (January 2025)
-# MAGIC **Target**: Bronze layer Delta table for raw data preservation
-# MAGIC
-# MAGIC **Best Practices Used:**
-# MAGIC - Delta Lake for ACID transactions
-# MAGIC - Spark native file handling
-# MAGIC - Volume storage for raw files
-# MAGIC - Proper partitioning for performance
+# MAGIC Downloads and ingests Wikimedia pageview data using daily sampling strategy
 
 # COMMAND ----------
 
@@ -19,47 +10,19 @@
 
 # COMMAND ----------
 
-# MAGIC %md
-# MAGIC ## Wikimedia Data Ingestion
-# MAGIC
-# MAGIC Now using environment variables and configuration loaded from the environment setup notebook.
-# MAGIC
-# MAGIC **Available variables from environment setup:**
-# MAGIC - `config`: Complete configuration dictionary
-# MAGIC - `volume_path`: Path to the raw data volume
-# MAGIC - `bronze_tables`, `silver_tables`, `gold_tables`: Table configurations
-
-# COMMAND ----------
-
-# Import required functions for data processing
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 from pyspark.sql.functions import to_timestamp, regexp_extract, rand, row_number
 from pyspark.sql.window import Window
-from datetime import datetime, timedelta
 from pyspark.sql.functions import current_timestamp, lit, input_file_name, col, split
+from pyspark.sql.types import StructType, StructField, StringType, IntegerType
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Use Files DataFrame from Environment Setup
+# MAGIC ## Daily Sampling Strategy
+# MAGIC
+# MAGIC Pick one random file per day during peak hours (12-16 UTC) to reduce data volume
 
 # COMMAND ----------
-
-# The files DataFrame is already loaded from the environment setup
-# It contains: filename, timestamp, file_size_bytes, full_url
-print(f"Using files DataFrame with {urls_df.count()} available files")
-print("\nSample files:")
-urls_df.show(5, truncate=False)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Download Files Using DataFrame
-
-# COMMAND ----------
-
-# Daily sampling strategy: Pick one random file per day during peak hours (12-16 UTC)
-# This reduces data volume significantly while maintaining daily patterns
 
 # Extract date and hour from filename for grouping
 files_with_datetime = urls_df.filter(
@@ -71,72 +34,54 @@ files_with_datetime = urls_df.filter(
     "hour", regexp_extract(
         col("filename"), r"pageviews-\d{8}-(\d{2})", 1).cast("int")
 ).filter(
-    # Filter for peak hours (12-16 UTC) when Wikipedia traffic is typically highest
-    col("hour").between(12, 16)
+    col("hour").between(12, 16)  # Peak hours
 )
 
-print(f"Found {files_with_datetime.count()} files during peak hours (12-16 UTC)")
+print(f"Found {files_with_datetime.count()} files during peak hours")
 
 # Group by date and pick one random file per day
 window_spec = Window.partitionBy("date").orderBy(rand(seed=42))
-
 daily_sampled_files = files_with_datetime.withColumn(
     "row_number", row_number().over(window_spec)
-).filter(
-    col("row_number") == 1
-).drop("date", "hour", "row_number")
+).filter(col("row_number") == 1).drop("date", "hour", "row_number")
 
 files_to_download = daily_sampled_files.orderBy("timestamp")
-
 print(f"Daily sampling completed: {files_to_download.count()} files selected")
-print("Strategy: One random file per day during peak hours (12-16 UTC)")
-print("Expected data volume: ~1.5-2M records per file = ~45-60M total records")
-
-# Download files directly to volume
-download_results = []
-for row in files_to_download.collect():
-    filename = row['filename']
-    full_url = row['full_url']
-    file_size = row['file_size_bytes']
-    volume_file_path = f"{volume_path}/{filename}"
-
-    print(f"Downloading: {filename} ({file_size} bytes)")
-    try:
-        # Download directly to volume using dbutils
-        dbutils.fs.cp(full_url, volume_file_path)
-        download_results.append({
-            'filename': filename,
-            'status': 'success',
-            'volume_path': volume_file_path,
-            'file_size': file_size
-        })
-        print(f"Downloaded: {filename}")
-    except Exception as e:
-        download_results.append({
-            'filename': filename,
-            'status': 'failed',
-            'error': str(e)
-        })
-        print(f"Failed: {filename} - {e}")
-
-# Create download results DataFrame
-download_results_df = spark.createDataFrame(download_results)
-print(f"\nDownload summary:")
-download_results_df.show(truncate=False)
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Define Spark Schema for Wikimedia Data
-# MAGIC
-# MAGIC Based on the sample data structure:
-# MAGIC `"project page_title view_count access_method"`
-# MAGIC
-# MAGIC Example: `"en.wikipedia Main_Page 1500 desktop"`
+# MAGIC ## Download Files
 
 # COMMAND ----------
 
+# Download files to volume
+download_results = []
+for row in files_to_download.collect():
+    filename = row['filename']
+    full_url = row['full_url']
+    volume_file_path = f"{volume_path}/{filename}"
 
+    try:
+        dbutils.fs.cp(full_url, volume_file_path)
+        download_results.append({'filename': filename, 'status': 'success'})
+        print(f"Downloaded: {filename}")
+    except Exception as e:
+        download_results.append(
+            {'filename': filename, 'status': 'failed', 'error': str(e)})
+        print(f"Failed: {filename} - {e}")
+
+print(
+    f"Download completed: {len([r for r in download_results if r['status'] == 'success'])}/{len(download_results)}")
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Ingest Data
+
+# COMMAND ----------
+
+# Define schema
 wikimedia_schema = StructType([
     StructField("project", StringType(), True),
     StructField("page_title", StringType(), True),
@@ -144,33 +89,10 @@ wikimedia_schema = StructType([
     StructField("access_method", StringType(), True)
 ])
 
-print("Schema defined for Wikimedia pageview data")
+# Load and parse data
+bronze_df = spark.read.format("text").option(
+    "compression", "gzip").load(f"{volume_path}/*.gz")
 
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Load Data Using Spark Native File Reading
-
-# COMMAND ----------
-
-# Use Spark to read gzipped files directly
-# Spark can handle gzipped files natively without manual unzipping
-bronze_df = spark.read \
-    .format("text") \
-    .option("compression", "gzip") \
-    .load(f"{volume_path}/*.gz")
-
-print("Files loaded using Spark native gzip support")
-print(f"Loaded {bronze_df.count()} raw records from gzipped files")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Parse and Transform Data
-
-# COMMAND ----------
-
-# Parse the text data into structured format using Spark functions
 parsed_df = bronze_df.select(
     split(col("value"), " ").getItem(0).alias("project"),
     split(col("value"), " ").getItem(1).alias("page_title"),
@@ -180,148 +102,54 @@ parsed_df = bronze_df.select(
     current_timestamp().alias("ingestion_timestamp")
 )
 
-# Extract filename from source_file path for joining with metadata
-parsed_df = parsed_df.withColumn(
-    "filename",
-    regexp_extract(col("source_file"), r"([^/]+\.gz)$", 1)
-)
-
-print("Data parsed and filename extracted for metadata joining")
-
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Enrich Data with Metadata from URLs DataFrame
+# MAGIC ## Enrich and Write
 
 # COMMAND ----------
 
-# Join parsed data with metadata from urls_df
+# Enrich with metadata
 enriched_df = parsed_df.join(
     urls_df.select("filename", "timestamp", "file_size_bytes", "full_url"),
     on="filename",
     how="left"
 ).select(
-    col("project"),
-    col("page_title"),
-    col("view_count"),
-    col("access_method"),
-    col("source_file"),
-    col("ingestion_timestamp"),
-    col("timestamp").alias("file_timestamp"),
-    col("file_size_bytes"),
-    col("full_url").alias("source_url")
-)
+    col("project"), col("page_title"), col("view_count"), col("access_method"),
+    col("source_file"), col("ingestion_timestamp"),
+    col("timestamp").alias("file_timestamp"), col(
+        "file_size_bytes"), col("full_url").alias("source_url")
+).withColumn("data_source", lit("wikimedia_pageviews"))
 
-print("Data enriched with metadata from URLs DataFrame")
-print(f"Enriched DataFrame schema:")
-enriched_df.printSchema()
-print(f"Sample enriched data:")
-enriched_df.show(5, truncate=False)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Add Metadata and Write to Bronze Table
-
-# COMMAND ----------
-
-# Use enriched data with metadata from URLs DataFrame
-final_bronze_df = enriched_df.withColumn(
-    "data_source", lit("wikimedia_pageviews"))
-
-# Get bronze table name from config
+# Write to bronze
 bronze_table_name = config['tables']['bronze']['wikimedia_pageviews']
+enriched_df.write.format("delta").mode("overwrite").option("overwriteSchema", "true").partitionBy(
+    "file_timestamp", "project").saveAsTable(bronze_table_name)
 
-print(f"Writing to bronze table: {bronze_table_name}")
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Write to Delta Table (Bronze Layer)
-
-# COMMAND ----------
-
-# Write directly to the Delta table with schema overwrite
-final_bronze_df.write \
-    .format("delta") \
-    .mode("overwrite") \
-    .option("overwriteSchema", "true") \
-    .partitionBy("file_timestamp", "project") \
-    .saveAsTable(bronze_table_name)
-
-print(f"Bronze table created successfully: {bronze_table_name}")
+print(f"Bronze table created: {bronze_table_name}")
+print(f"Records ingested: {enriched_df.count():,}")
 
 # COMMAND ----------
 
 # MAGIC %md
-# MAGIC ## Verify Data Ingestion
+# MAGIC ## Optimize Table
 
 # COMMAND ----------
 
-# Read back and verify
-bronze_table = spark.table(bronze_table_name)
-
-print("=== Bronze Table Verification ===")
-print(f"Table: {bronze_table_name}")
-print(f"Total records: {bronze_table.count()}")
-
-print("\nSchema:")
-bronze_table.printSchema()
-
-print("\nSample records:")
-bronze_table.show(5, truncate=False)
-
-# COMMAND ----------
-
-# MAGIC %md
-# MAGIC ## Data Optimization & Partitioning
-# MAGIC
-# MAGIC With 5.3 billion records, we need to optimize the table for performance and efficient querying.
-
-# COMMAND ----------
-
-# Table optimization for large-scale data
-print("Starting optimization for large-scale data")
-
-# 1. Optimize table layout and compression
+# Optimize for performance
 spark.sql(f"OPTIMIZE {bronze_table_name}")
-
-# 2. Z-order clustering on non-partition columns only
 spark.sql(
-    f"OPTIMIZE {bronze_table_name} ZORDER BY (access_method, view_count)")
-
-# 3. Vacuum old files (retain 7 days for safety)
-spark.sql(f"VACUUM {bronze_table_name} RETAIN 168 HOURS")
-
-# 4. Update table statistics for query optimization
+    f"OPTIMIZE {bronze_table_name} ZORDER BY (project, access_method, view_count)")
 spark.sql(f"ANALYZE TABLE {bronze_table_name} COMPUTE STATISTICS")
-spark.sql(
-    f"ANALYZE TABLE {bronze_table_name} COMPUTE STATISTICS FOR ALL COLUMNS")
 
 print("Table optimization completed")
 
 # COMMAND ----------
 
-# Verify optimization results
-optimized_files = spark.sql(
-    f"DESCRIBE DETAIL {bronze_table_name}").collect()[0]
-print(f"Optimized table details:")
-print(f"Number of files: {optimized_files['numFiles']}")
-print(f"Size in bytes: {optimized_files['sizeInBytes']:,}")
-print(f"Partitioning columns: {optimized_files['partitionColumns']}")
-
-# Show sample partition distribution
-partition_stats = spark.sql(f"""
-    SELECT 
-        file_timestamp,
-        project,
-        COUNT(*) as record_count,
-        COUNT(*) * 100.0 / (SELECT COUNT(*) FROM {bronze_table_name}) as percentage
-    FROM {bronze_table_name}
-    GROUP BY file_timestamp, project
-    ORDER BY record_count DESC
-    LIMIT 10
-""")
-
-print("\nTop 10 partitions by record count:")
-partition_stats.show()
+# Exit
+dbutils.notebook.exit({
+    "status": "success",
+    "bronze_table": bronze_table_name,
+    "record_count": enriched_df.count(),
+    "message": "Ingestion completed successfully"
+})
