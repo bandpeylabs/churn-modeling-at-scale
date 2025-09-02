@@ -24,7 +24,11 @@ print(f"Configuration loaded: {config['catalog']}.{config['schema']}")
 # COMMAND ----------
 
 # Create Unity Catalog structure
-spark.sql(f"CREATE CATALOG IF NOT EXISTS {config['catalog']}")
+try:
+    spark.sql(f"CREATE CATALOG {config['catalog']}")
+except Exception as e:
+    print(f"Catalog {config['catalog']} already exists or error occurred: {e}")
+
 spark.sql(f"USE CATALOG {config['catalog']}")
 spark.sql(f"CREATE SCHEMA IF NOT EXISTS {config['schema']}")
 spark.sql(f"USE SCHEMA {config['schema']}")
@@ -35,7 +39,7 @@ try:
     spark.sql(f"CREATE VOLUME IF NOT EXISTS {config['volume']}")
     print(f"Volume created: {volume_path}")
 except Exception as e:
-    print(f"Volume exists: {volume_path}")
+    print(f"Volume exists or error occurred: {volume_path}, {e}")
 
 # COMMAND ----------
 
