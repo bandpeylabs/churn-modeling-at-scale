@@ -742,10 +742,7 @@ print(f"Subscription data written to: {subscription_table}")
 
 # COMMAND ----------
 
-# Clean up and exit
-dbutils.notebook.exit({
-    "status": "success",
-    "bronze_tables_created": [user_behavior_table, subscription_table],
-    "total_records_generated": len(synthetic_data) + len(subscription_data),
-    "message": "Data exploration and synthetic data generation completed successfully"
-})
+# Data exploration and synthetic data generation completed successfully
+print(f"User behavior data written to: {user_behavior_table}")
+print(f"Subscription data written to: {subscription_table}")
+print("Data exploration and synthetic data generation completed successfully")

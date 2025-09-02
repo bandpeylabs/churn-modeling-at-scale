@@ -731,12 +731,9 @@ print(f"Predictions written to: {predictions_table}")
 
 # COMMAND ----------
 
-# Clean up and exit
-dbutils.notebook.exit({
-    "status": "success",
-    "best_model": "Random Forest (Tuned)",
-    "roc_auc": tuned_auc,
-    "pr_auc": tuned_pr_auc,
-    "predictions_table": predictions_table,
-    "message": "Churn modeling completed successfully. Model deployed and ready for production use."
-})
+# Churn modeling completed successfully
+print(f"Best model: Random Forest (Tuned)")
+print(f"ROC-AUC: {tuned_auc:.4f}")
+print(f"PR-AUC: {tuned_pr_auc:.4f}")
+print(f"Predictions written to: {predictions_table}")
+print("Churn modeling completed successfully. Model deployed and ready for production use.")

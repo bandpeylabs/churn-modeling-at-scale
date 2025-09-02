@@ -728,11 +728,8 @@
 
 # COMMAND ----------
 
-# Clean up and exit
-dbutils.notebook.exit({
-    "status": "success",
-    "dashboard_queries": "All dashboard queries generated successfully",
-    "business_insights": "Comprehensive business intelligence insights created",
-    "executive_summary": "Executive dashboard ready for stakeholder review",
-    "message": "Dashboard and business intelligence notebook completed. All queries ready for dashboard integration."
-})
+# Dashboard and business intelligence completed successfully
+print("All dashboard queries generated successfully")
+print("Comprehensive business intelligence insights created")
+print("Executive dashboard ready for stakeholder review")
+print("Dashboard and business intelligence notebook completed. All queries ready for dashboard integration.")

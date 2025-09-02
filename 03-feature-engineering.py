@@ -642,11 +642,8 @@ print(f"Feature matrix written to silver layer: {user_features_table}")
 
 # COMMAND ----------
 
-# Clean up and exit
-dbutils.notebook.exit({
-    "status": "success",
-    "feature_matrix_table": user_features_table,
-    "total_features": len(feature_matrix.columns),
-    "total_users": feature_matrix.count(),
-    "message": "Feature engineering completed successfully. Feature matrix ready for churn modeling."
-})
+# Feature engineering completed successfully
+print(f"Feature matrix written to silver layer: {user_features_table}")
+print(f"Total features: {len(feature_matrix.columns)}")
+print(f"Total users: {feature_matrix.count():,}")
+print("Feature engineering completed successfully. Feature matrix ready for churn modeling.")

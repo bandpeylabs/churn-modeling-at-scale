@@ -39,28 +39,19 @@ except Exception as e:
 
 # COMMAND ----------
 
-# Create tables
-tables = {
-    'bronze_wikimedia_pageviews': 'bronze',
-    'bronze_user_behavior': 'bronze',
-    'bronze_subscription_data': 'bronze',
-    'silver_user_features': 'silver',
-    'silver_churn_features': 'silver',
-    'gold_churn_predictions': 'gold',
-    'gold_churn_insights': 'gold'
-}
-
-for table_name, layer in tables.items():
-    try:
-        spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {table_name} (
-            temp_column STRING
-        ) USING DELTA
-        """)
-        spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
-        print(f"Created {layer} table: {table_name}")
-    except Exception as e:
-        print(f"Table {table_name} exists")
+# Create tables from configuration
+for layer_name, layer_tables in config['tables'].items():
+    for table_key, table_name in layer_tables.items():
+        try:
+            spark.sql(f"""
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                temp_column STRING
+            ) USING DELTA
+            """)
+            spark.sql(f"ALTER TABLE {table_name} DROP COLUMN temp_column")
+            print(f"Created {layer_name} table: {table_name}")
+        except Exception as e:
+            print(f"Table {table_name} exists")
 
 # COMMAND ----------
 
@@ -85,11 +76,8 @@ print(f"Loaded {urls_df.count()} Wikimedia files")
 
 # COMMAND ----------
 
-# Exit with configuration
-dbutils.notebook.exit({
-    "status": "success",
-    "config": config,
-    "urls_df": urls_df,
-    "volume_path": volume_path,
-    "message": "Environment setup completed"
-})
+# Environment setup completed
+print(f"Configuration loaded: {config['catalog']}.{config['schema']}")
+print(f"Volume path: {volume_path}")
+print(f"Loaded {urls_df.count()} Wikimedia files")
+print("Environment setup completed")

@@ -146,10 +146,7 @@ print("Table optimization completed")
 
 # COMMAND ----------
 
-# Exit
-dbutils.notebook.exit({
-    "status": "success",
-    "bronze_table": bronze_table_name,
-    "record_count": enriched_df.count(),
-    "message": "Ingestion completed successfully"
-})
+# Ingestion completed successfully
+print(f"Bronze table created: {bronze_table_name}")
+print(f"Records ingested: {enriched_df.count():,}")
+print("Ingestion completed successfully")
