@@ -1,7 +1,6 @@
 main:
   catalog: 'demos'
   schema: 'subscriber_churn'
-
   volume: 'raw_data'
 
   tables:
@@ -11,39 +10,21 @@ main:
       subscription_data: 'bronze_subscription_data'
 
     silver:
-      cleaned_pageviews: 'silver_cleaned_pageviews'
-      user_engagement: 'silver_user_engagement'
       user_features: 'silver_user_features'
-      subscription_events: 'silver_subscription_events'
+      churn_features: 'silver_churn_features'
 
     gold:
-      predictions: 'churn_predictions'
-      churn_insights: 'gold_churn_insights'
-      retention_metrics: 'gold_retention_metrics'
-      feature_importance: 'gold_feature_importance'
+      predictions: 'gold_churn_predictions'
+      insights: 'gold_churn_insights'
 
   data_sources:
     wikimedia:
       base_url: 'https://dumps.wikimedia.org/other/pageviews/2025/2025-01'
 
-    synthetic:
-      user_behavior_path: '/dbfs/tmp/synthetic_user_behavior.csv'
-      subscription_path: '/dbfs/tmp/synthetic_subscription_data.csv'
-
   ml:
-    model_registry: 'churn_prediction_model'
-    feature_store: 'churn_features'
     experiment_name: 'churn_modeling_experiment'
 
   churn_config:
     churn_window_days: 90
     prediction_horizon_days: 30
-    min_engagement_days: 7
     feature_lookback_days: 30
-
-  features:
-    engagement_metrics:
-      ['dau', 'wau', 'mau', 'session_length', 'content_diversity']
-    behavioral_patterns:
-      ['usage_frequency', 'feature_adoption', 'support_tickets']
-    subscription_attributes: ['plan_type', 'billing_cycle', 'payment_method']
